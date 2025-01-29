@@ -58,20 +58,7 @@ def main():
 
     np_gain = np.array(loaded_dataset['values']["gain"]) /  np.max(loaded_dataset['values']["gain"])
     np_data = np.array(loaded_dataset['data'])
-
-
-    """
-    FILTER
-    """
-    key = list(filtered.keys())[0]
-    gain_val = np.array(loaded_dataset['values'][key])
-    mask = gain_val >= filtered[key]
-
-    for key in loaded_dataset['values'].keys():
-        loaded_dataset['values'][key] = np.array(loaded_dataset['values'][key])[mask]
-
-    np_data = np_data[mask]
-    np_gain = np_gain[mask]
+    print(np_data.shape)
 
     """
     PREPROCESSING OF DATA (normalization,...)
@@ -155,8 +142,11 @@ def main():
         """
         # Batch size
         batch_size = batch_size_vae
-        train_datasettt = tf.data.Dataset.from_tensor_slices((np_data_train)).batch(batch_size)
-        val_datasettt = tf.data.Dataset.from_tensor_slices((np_data_val)).batch(batch_size)
+        # train_datasettt = tf.data.Dataset.from_tensor_slices((np_data_train)).batch(batch_size)
+        # val_datasettt = tf.data.Dataset.from_tensor_slices((np_data_val)).batch(batch_size)
+        
+        train_datasettt, val_datasettt = fci_dataset.to_dataset(np_data, batch_size=batch_size_vae, shuffle=True, split = 0.8)
+        # val_datasettt = fci_dataset.to_dataset(np_data_val, batch_size=batch_size_vae, shuffle=True)
 
         """
         Preparation of training  

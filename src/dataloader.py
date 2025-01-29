@@ -27,6 +27,20 @@ class DataLoader:
     def get_model(self):
         return self.model
     
+    def to_dataset(self,data,batch_size,shuffle=True,split=0.8):
+        """ shuflle, split and Convert to tf.data.Dataset object.
+        """
+        dataset = data
+        if shuffle:
+            dataset = tf.random.shuffle(dataset)
+            
+        train_dataset = dataset[:int(len(dataset)*split)]
+        test_dataset = dataset[int(len(dataset)*split):]
+        train_dataset = tf.data.Dataset.from_tensor_slices((train_dataset)).batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
+        test_dataset = tf.data.Dataset.from_tensor_slices((test_dataset)).batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
+           
+        return train_dataset, test_dataset
+    
     def _load_data(self):
         """Load dataset.
         """

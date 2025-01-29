@@ -14,6 +14,6 @@
         "result_folder" : "./testing/std_dyn_shell_9435_latent_5_kl_1e-05_256/"
     },
     "filter" : {
-        "gain" : 0
+        "gain" : 2e-6
     }
 }
