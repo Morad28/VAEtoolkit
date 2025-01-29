@@ -1,0 +1,9 @@
+src_dynshell/
+decoding/
+datasets/
+results/
+out/
+test/
+__pycache__/
+*.dat
+testing/

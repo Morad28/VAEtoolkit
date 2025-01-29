@@ -1,0 +1,19 @@
+{
+    "dataset_path": "datasets/smooth_data_testing.npy",
+    "results_dir": "testing/",
+    "name": "dyn_shell",
+    "epoch_vae": 2,
+    "epoch_rna": 3,
+    "latent_dim": 5,
+    "batch_size_vae": 256,
+    "batch_size_rna": 128,
+    "kl_loss": 1e-5,
+    "training" : ["gain", "yield"],
+    "reprise" : {
+        "gain_only" : 0,
+        "result_folder" : "./testing/std_dyn_shell_9435_latent_5_kl_1e-05_256/"
+    },
+    "filter" : {
+        "gain" : 0
+    }
+}
