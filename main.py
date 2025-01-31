@@ -15,11 +15,10 @@ import matplotlib.cm as cm
 import matplotlib
 import shutil
 import tensorflow as tf
+from src.trainer import Trainer_FCI
 from keras import losses
 matplotlib.use('Agg')
 cmap = matplotlib.colormaps['viridis']  
-
-
 
 if __name__ == '__main__':
     config_path = sys.argv[1]
@@ -37,65 +36,11 @@ if __name__ == '__main__':
     
     # Load dataset and preprocessing
     fci_dataset = DataLoaderFCI(dataset_path)
-    dataset = fci_dataset.pipeline(batch_size=batch_size_vae, shuffle=True, split = 0.8,filter = filtered)
-
-    input_shape = fci_dataset.get_shape(1)
-    latent_dim = latent_dim
-    r_loss = 1.
-    k_loss = kl_loss 
-    gain_loss = 0.
+    fci_dataset.pipeline(batch_size=batch_size_vae, shuffle=True, split = 0.8,filter = filtered)
         
     # Get VAE model
-    model = ModelSelector("1D")
-    autoencoder, encoder, decoder = model.get_model(
-        input_shape = (input_shape,1), 
-        latent_dim=latent_dim,
-        r_loss = r_loss,
-        k_loss=k_loss,
-        gain_loss=gain_loss
-    )
+    model = ModelSelector()
+    model.select("1D")
     
-    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-                initial_learning_rate=0.001,
-                decay_steps=4000,
-                decay_rate=0.9,
-                staircase=False
-            )
-    optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)   
-    
-    autoencoder.compile(optimizer=optimizer)
-    
-
-    results_path = Path(results_dir)
-    results_path.mkdir(parents=True, exist_ok=True)
-    folder_name = f"std_{name}_{fci_dataset.get_shape(0)}_latent_{int(latent_dim)}_kl_{k_loss}_{batch_size_vae}"
-    res_folder = results_path / folder_name
-
-    
-    log_dir = res_folder / "logs"
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(
-    log_dir=log_dir
-    )
-
-    callbacks=[
-        tensorboard_callback
-    ]
-    
-    # Train VAE model
-    history = autoencoder.fit(
-            dataset["train_x"],
-            epochs=epoch_vae, 
-            validation_data=dataset["val_x"],
-            callbacks=callbacks,
-            verbose = 2
-    )
-
-    autoencoder.save(res_folder / "model.keras")
-    encoder.save(res_folder / 'encoder_model.keras')
-    decoder.save(res_folder / 'decoder_model.keras')
-    
-    # Saving latent space
-    batch_size = 128
-    dataset_batched = fci_dataset.pipeline(batch_size=batch_size,shuffle=False,split=0,filter = filtered)
-    _, _, z = encoder.predict(dataset_batched["train_x"])
-    np.savetxt(res_folder / 'latent_z.txt',z)
+    trainer = Trainer_FCI(model, fci_dataset, config)
+    trainer.train()

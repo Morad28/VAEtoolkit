@@ -1,5 +1,5 @@
 import sys
-from src.vae_class import VAE, Sampling
+from src.model import ModelSelector
 from src.config_vae import get_config
 import sys
 import pandas as pd 
@@ -11,9 +11,12 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import matplotlib.cm as cm
 import matplotlib
-import random
 import shutil
 from src.dataloader import DataLoader, DataLoaderFCI
+import tensorflow as tf
+from keras import losses
+
+
 
 # To remove
 # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -42,11 +45,6 @@ def main():
     
     loaded_dataset = np.load(dataset_path, allow_pickle=True).item()
         
-    import tensorflow as tf
-    from tensorflow import keras
-    from keras import layers, losses
-    from keras.layers import Input, Dense, Conv1D, Conv1DTranspose, Flatten, Reshape, MaxPooling1D
-    
 
     """
     DATA PROCESSING 
@@ -58,31 +56,12 @@ def main():
 
     np_gain = np.array(loaded_dataset['values']["gain"]) /  np.max(loaded_dataset['values']["gain"])
     np_data = np.array(loaded_dataset['data'])
+    np_data = np_data / np.max(np_data)
     print(np_data.shape)
 
     """
     PREPROCESSING OF DATA (normalization,...)
     """
-
-    # np_data = np.array(data)[:,:] 
-    np_data = np_data / np.max(np_data)
-
-    # Shuffle data and split
-    combined = list(zip(np_data,np_gain))
-    random.shuffle(combined)
-
-    np_data_shuffled, np_gain_shuffled = zip(*combined)
-    np_data_shuffled = np.array(np_data_shuffled)
-    np_gain_shuffled = np.array(np_gain_shuffled)
-
-    train_size = int(0.8 * np_data.shape[0])
-
-    np_data_train = np_data_shuffled[:train_size]
-    np_gain_train = np_gain_shuffled[:train_size]
-
-    np_data_val = np_data_shuffled[train_size:]
-    np_gain_val = np_gain_shuffled[train_size:]
-
     def below_10_percent(y_true, y_pred):
         y_true = tf.cast(y_true,tf.float32)
         absolute_error = tf.abs( y_true- y_pred)
@@ -94,77 +73,41 @@ def main():
         """
         DEFINITION OF DEEP LEARNING MODEL
         """
-
-
-
-        def std_conv_ae(input_shape=250,latent_dim = 64, r_loss = 1, k_loss = 1, gain_loss = 1):
-            
-            inputs = Input(shape=(input_shape,1))
-            x = Conv1D(32, 3, activation='leaky_relu', padding='same', strides=2)(inputs)
-            x = MaxPooling1D(pool_size=2)(x)
-            x = Conv1D(64, 3, activation='leaky_relu', padding='same', strides=2)(x)
-            x = MaxPooling1D(pool_size=2)(x)
-            x = Conv1D(64, 3, activation='leaky_relu', padding='same', strides=2)(x)
-            x = MaxPooling1D(pool_size=2)(x)
-            x = Conv1D(128, 3, activation='leaky_relu', padding='same', strides=2)(x)
-            x = MaxPooling1D(pool_size=2)(x)
-            x = Conv1D(128, 3, activation='leaky_relu', padding='same', strides=2)(x)
-            x = Flatten()(x)
-
-            z_mean    = layers.Dense(latent_dim, name="z_mean")(x)
-            z_log_var = layers.Dense(latent_dim, name="z_log_var")(x)
-            z         = Sampling()([z_mean, z_log_var])
-            encoder = keras.Model(inputs, [z_mean, z_log_var, z], name="encoder")
-            encoder.compile()
-            print(encoder.summary())
-
-            inputs = Input(shape=(latent_dim,))
-            x = Dense   (32*128,  activation='leaky_relu')(inputs)
-            x = Reshape((32,128))(x)
-            x = Conv1DTranspose(128, 3, activation='leaky_relu', padding='same', strides=2)(x)
-            x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=2)(x)
-            x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=2)(x)
-            x = Conv1DTranspose(32, 3, activation='leaky_relu', padding='same', strides=2)(x)
-            decoded = Conv1DTranspose(1, 1, padding='same')(x)
-            decoded = Reshape((512,))(decoded)
-            decoder = tf.keras.Model(inputs,  decoded, name='decoder')
-            decoder.compile()
-
-            print(decoder.summary())
-
-            autoencoder = VAE(encoder,decoder, [r_loss,k_loss,gain_loss])
-
-
-            return(autoencoder, encoder, decoder)
-
-        """
-        PREPARE DATASET FOR TRAINING
-        """
-        # Batch size
-        batch_size = batch_size_vae
-        # train_datasettt = tf.data.Dataset.from_tensor_slices((np_data_train)).batch(batch_size)
-        # val_datasettt = tf.data.Dataset.from_tensor_slices((np_data_val)).batch(batch_size)
-        
-        train_datasettt, val_datasettt = fci_dataset.to_dataset(np_data, batch_size=batch_size_vae, shuffle=True, split = 0.8)
-        # val_datasettt = fci_dataset.to_dataset(np_data_val, batch_size=batch_size_vae, shuffle=True)
-
-        """
-        Preparation of training  
-        """
-
-        # Parameters (nothing to be modified here all is avaible in command line)
         input_shape = np_data.shape[1]
         latent_dim = latent_dim
         r_loss = 1.
         k_loss = kl_loss 
         gain_loss = 0.
-        autoencoder, encoder, decoder = std_conv_ae(input_shape,latent_dim,r_loss,k_loss,gain_loss) # ref
+            
+        ModelSelector = ModelSelector()
+        autoencoder, encoder, decoder = ModelSelector.get_1d_vae(
+            input_shape = (input_shape,1), 
+            latent_dim=latent_dim,
+            r_loss = r_loss,
+            k_loss=k_loss,
+            gain_loss=gain_loss
+        )
+        
+
+        """
+        PREPARE DATASET FOR TRAINING
+        """
+
+        batch_size = batch_size_vae
+        train_datasettt, val_datasettt = fci_dataset.to_dataset(np_data, batch_size=batch_size_vae, shuffle=True, split = 0.8)
+
+        """
+        Preparation of training  
+        """
+
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
                         initial_learning_rate=0.001,
                         decay_steps=4000,
                         decay_rate=0.9,
                         staircase=False)
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)   
+        
+        
         autoencoder.compile(optimizer=optimizer,metrics = [below_10_percent])
 
         res_name = f'{results_dir}'
@@ -190,11 +133,10 @@ def main():
         tensorboard_callback = tf.keras.callbacks.TensorBoard(
             log_dir=log_dir
         )
-        callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50)
 
         callbacks=[
-            # callback,
-            tensorboard_callback]
+            tensorboard_callback
+        ]
 
         epochs = epoch_vae
 
@@ -215,9 +157,8 @@ def main():
         It can be ignored if you just want to use the model.
         """
 
-        dataset = tf.data.Dataset.from_tensor_slices((np_data,np_gain))
         batch_size = 128
-        dataset_batched = dataset.batch(batch_size)
+        dataset_batched, _ = fci_dataset.to_dataset(np_data,batch_size=batch_size,shuffle=False,split =0)
 
 
         data_train = history.history['loss']
@@ -397,40 +338,8 @@ def main():
         plt.close()
 
         dataset_gain = tf.data.Dataset.from_tensor_slices((z,(norm_gain)))
-
-        validation_size = int(0.2 * np_gain.shape[0])
-
-        gain_shuffled_dataset    = dataset_gain.shuffle(buffer_size=5000)
-        gain_train_dataset       = gain_shuffled_dataset.skip(validation_size)
-        gain_validation_dataset  = gain_shuffled_dataset.take(validation_size)
-
-        batch_size = batch_size_rna
-        gain_batched_train_dataset = gain_train_dataset.batch(batch_size)
-        gain_batched_validation_dataset = gain_validation_dataset.batch(batch_size)
-
-            
-        def standard_ae_r(input_shape):
-
-            inputs = Input(shape=(input_shape,))
-            x = Dense(64, activation='leaky_relu')(inputs)
-            x = Dense(64, activation='leaky_relu')(x)
-            x = Dense(128, activation='leaky_relu')(x)
-            x = Dense(128, activation='leaky_relu')(x)
-            x = Dense(256, activation='leaky_relu')(x)
-            x = Dense(256, activation='leaky_relu')(x)
-            x = Dense(256, activation='leaky_relu')(x)
-            x = Dense(256, activation='leaky_relu')(x)
-            x = Dense(128, activation='leaky_relu')(x)
-            x = Dense(128, activation='leaky_relu')(x)
-            x = Dense(64, activation='leaky_relu')(x)
-            x = Dense(64, activation='leaky_relu')(x)
-            decoded = Dense(1)(x)
-                
-            model = tf.keras.Model(inputs,  decoded, name='decoder')
-            return(model)
-
-
-        latent_gain = standard_ae_r(latent_dim)
+        gain_batched_train_dataset,gain_batched_validation_dataset = fci_dataset.to_dataset((z,norm_gain),batch_size_rna,shuffle=True, split = 0.8)
+        latent_gain = ModelSelector.get_gain_network(latent_dim)
 
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
                         initial_learning_rate=0.0005,
@@ -439,8 +348,6 @@ def main():
                         staircase=False)
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)   
         latent_gain.compile(optimizer=optimizer, loss=losses.MeanSquaredError(),metrics=['MAPE',below_10_percent])
-
-
 
         log_dir = res_folder_n + "logs"
         tensorboard_callback = tf.keras.callbacks.TensorBoard(

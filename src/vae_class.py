@@ -201,6 +201,6 @@ class VAE(keras.Model):
     def reload(self,filename):
         '''Reload a 2 part saved model.'''
         filename, extension = os.path.splitext(filename)
-        self.encoder = keras.models.load_model(f'{filename}-encoder.keras', custom_objects={'SamplingLayer': SamplingLayer})
-        self.decoder = keras.models.load_model(f'{filename}-decoder.keras')
+        self.encoder = keras.ModelSelector.load_model(f'{filename}-encoder.keras', custom_objects={'SamplingLayer': SamplingLayer})
+        self.decoder = keras.ModelSelector.load_model(f'{filename}-decoder.keras')
         print('Reloaded.')

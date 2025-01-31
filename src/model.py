@@ -10,7 +10,7 @@ class ModelSelector:
     def __init__(self):
         self.model_name = "1D"
     
-    def set_model_name(self, model_name):
+    def select(self, model_name):
         self.model_name = model_name
         
     def get_model(self,input_shape=(512,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.):

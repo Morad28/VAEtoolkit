@@ -10,7 +10,7 @@ class Trainer:
         self.data_loader = data_loader
         self.config = config
     
-    def train_pipeline(self):
+    def train(self):
         pass
     
     
@@ -20,7 +20,7 @@ class Trainer_FCI(Trainer):
         self.res_folder = None
         self.dataset = None
         
-    def train_pipeline(self):
+    def train(self):
         self.train_vae()
     
     def train_vae(self):
@@ -93,7 +93,8 @@ class Trainer_FCI(Trainer):
     
         # Saving latent space
         batch_size = 128
-        dataset_batched = self.data_loader.pipeline(batch_size=batch_size,shuffle=False,split=0,filter = filtered)
+        self.data_loader.pipeline(batch_size=batch_size,shuffle=False,split=0,filter = filtered)
+        dataset_batched = self.data_loader.get_tf_dataset()
         _, _, z = encoder.predict(dataset_batched["train_x"])
         np.savetxt(res_folder / 'latent_z.txt',z)
 
