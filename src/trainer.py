@@ -63,9 +63,49 @@ class Trainer:
         encoder.save(self.res_folder / 'encoder_model.keras')
         decoder.save(self.res_folder / 'decoder_model.keras')
         
-        models["vae"] = [autoencoder, encoder, decoder]
+        models["vae"] = (autoencoder, encoder, decoder)
                 
         return history
+    
+    def _train_mlp(self,x,y,models,res_folder_n=Path('./')):
+        epoch_rna = self.config["epoch_rna"]
+        latent_gain = models["mlp"]
+
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+                initial_learning_rate=0.0005,
+                decay_steps=500,
+                decay_rate=0.95,
+                staircase=False)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)   
+        latent_gain.compile(optimizer=optimizer, loss=tf.keras.losses.MeanSquaredError(),metrics=['MAPE'])
+
+        log_dir = res_folder_n / "logs"
+        tensorboard_callback = tf.keras.callbacks.TensorBoard(
+            log_dir=log_dir
+        )
+        callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50)
+
+
+        callbacks=[
+            # callback,
+            tensorboard_callback]
+
+
+        epoch = epoch_rna
+
+
+        history = latent_gain.fit(x,
+            epochs=epoch, 
+            validation_data=y,
+            callbacks=callbacks,
+            verbose = 2)
+
+        latent_gain.save(res_folder_n / "model.keras")
+
+        models["mlp"] = latent_gain
+
+        return history
+
     
     def train(self):
         pass
@@ -100,7 +140,6 @@ class Trainer_FCI(Trainer):
         dataset = self.data_loader.get_tf_dataset()
         self.dataset = dataset
 
-
         input_shape = self.data_loader.get_shape()[1]
         r_loss = 1.
         k_loss = kl_loss 
@@ -109,10 +148,10 @@ class Trainer_FCI(Trainer):
         # Get VAE model
         models = self.model.get_model(
             input_shape = (input_shape,1), 
-            latent_dim=latent_dim,
-            r_loss = r_loss,
-            k_loss=k_loss,
-            gain_loss=gain_loss
+            latent_dim  = latent_dim,
+            r_loss      = r_loss,
+            k_loss      = k_loss,
+            gain_loss   = gain_loss
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
@@ -124,24 +163,19 @@ class Trainer_FCI(Trainer):
         dataset_batched = self._raw_data.get_tf_dataset()
         _, _, z = encoder.predict(dataset_batched["train_x"])
         np.savetxt(self.res_folder / 'latent_z.txt',z)
+        return history
 
         
     def train_gain(self,var_name):
         config = self.config
         # Access parameters
-        dataset_path = config["dataset_path"]
         results_dir = config["results_dir"]
         name = config["name"]
-        epoch_vae = config["epoch_vae"]
-        epoch_rna = (config["epoch_rna"])
         latent_dim = (config["latent_dim"])
-        batch_size_vae = config["batch_size_vae"]
         batch_size_rna = config["batch_size_rna"]
         kl_loss = (config["kl_loss"])
-        log = config["log"]
-        values = config["training"]
         gain_only = config["reprise"]["gain_only"]
-        filtered = config["filter"]
+        batch_size_vae = config["batch_size_vae"]
         
         if gain_only:
             res_folder = config["reprise"]["result_folder"]
@@ -155,50 +189,21 @@ class Trainer_FCI(Trainer):
             res_folder = results_path / folder_name
             z = np.loadtxt(res_folder / 'latent_z.txt')
 
-
-
         _, gain = self.data_loader.get_x_y(var_name)
-    
         gain_dataset = self.data_loader.to_tensorflow_dataset((z,gain))
-
         res_folder_n = res_folder / "values" / var_name 
-        
-        gain_batched_train_dataset,gain_batched_validation_dataset = self.data_loader.to_dataset(dataset=gain_dataset)
+        gain_batched_train_dataset,gain_batched_validation_dataset = self.data_loader.to_dataset(
+            batch_size=batch_size_rna,
+            shuffle=True,
+            split=0.8,
+            dataset=gain_dataset
+        )
         
         
         models = self.model.get_model(
             latent_dim=latent_dim
         )
-        
-        latent_gain = models["gain"]
 
-        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-                        initial_learning_rate=0.0005,
-                        decay_steps=500,
-                        decay_rate=0.95,
-                        staircase=False)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)   
-        latent_gain.compile(optimizer=optimizer, loss=tf.keras.losses.MeanSquaredError(),metrics=['MAPE'])
+        history = self._train_mlp(gain_batched_train_dataset,gain_batched_validation_dataset,models)
 
-        log_dir = res_folder_n / "logs"
-        tensorboard_callback = tf.keras.callbacks.TensorBoard(
-            log_dir=log_dir
-        )
-        callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50)
-
-
-        callbacks=[
-            # callback,
-            tensorboard_callback]
-
-
-        epoch = epoch_rna
-
-
-        history = latent_gain.fit(gain_batched_train_dataset,
-            epochs=epoch, 
-            validation_data=gain_batched_validation_dataset,
-            callbacks=callbacks,
-            verbose = 2)
-
-        latent_gain.save(res_folder_n / "model.keras")
+        return history

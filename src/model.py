@@ -21,10 +21,9 @@ class ModelSelector:
         if self.vae == '2D':
             s["vae"] = self._get_2d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
         if self.gain == '12MLP':
-            s["gain"] = self._get_gain_network_12_mlp(latent_dim)
+            s["mlp"] = self._get_gain_network_12_mlp(latent_dim)
         else:
             raise ValueError('Model name not recognized')
-        print(s)
         return s
         
     
