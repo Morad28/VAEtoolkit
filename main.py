@@ -24,19 +24,19 @@ if __name__ == '__main__':
     config_path = sys.argv[1]
     config = get_config(config_path)
     
-    # Access parameters
-    dataset_path = config["dataset_path"]
-    results_dir = config["results_dir"]
-    name = config["name"]
-    epoch_vae = config["epoch_vae"]
-    latent_dim = config["latent_dim"]
-    batch_size_vae = config["batch_size_vae"]
-    kl_loss = config["kl_loss"]
-    filtered = config["filter"]
+    # # Access parameters
+    # dataset_path = config["dataset_path"]
+    # results_dir = config["results_dir"]
+    # name = config["name"]
+    # epoch_vae = config["epoch_vae"]
+    # latent_dim = config["latent_dim"]
+    # batch_size_vae = config["batch_size_vae"]
+    # kl_loss = config["kl_loss"]
+    # filtered = config["filter"]
     
     # Load dataset and preprocessing
-    fci_dataset = DataLoaderFCI(dataset_path)
-    fci_dataset.pipeline(batch_size=batch_size_vae, shuffle=True, split = 0.8,filter = filtered)
+    fci_dataset = DataLoaderFCI(config)
+    # fci_dataset.pipeline(batch_size=batch_size_vae, shuffle=True, split = 0.8, filter = filtered)
         
     # Get VAE model
     model = ModelSelector()

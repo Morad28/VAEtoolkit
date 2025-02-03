@@ -7,9 +7,9 @@ import numpy as np
 
 
 class DataLoader:
-    def __init__(self, dataset_path, result_folder=None):
-        
-        self.dataset_path = dataset_path
+    def __init__(self, config, result_folder=None):
+        self.config = config
+        self.dataset_path = config["dataset_path"]
         self.result_folder = result_folder
         self.dataset = None
         self.model = None
@@ -33,7 +33,10 @@ class DataLoader:
     def get_model(self):
         return self.model
     
-    def to_dataset(self, batch_size, shuffle=True, split=0.8):
+    def get_x_y():
+        pass
+    
+    def to_dataset(self, batch_size = 128, shuffle=True, split=0.8, dataset = None):
         """ Shuffle, split, and convert to tf.data.Dataset object.
         
         Args:
@@ -46,78 +49,11 @@ class DataLoader:
             train_dataset: A tf.data.Dataset object for training.
             test_dataset: A tf.data.Dataset object for testing.
         """
-        pass
-            
-    
-    def _to_tensorflow_dataset(self,data):
-        if isinstance(data, tuple):
-            x, y = data
-            dataset = tf.data.Dataset.from_tensor_slices((x, y))
-        else:
-            dataset = tf.data.Dataset.from_tensor_slices(data)
-        return(dataset)
-    
-    def _load_data(self):
-        """Load dataset.
-        """
-        pass
-    
-    def _load_model(self):
-        """Load model.
-        """
-        pass
-
-
-class DataLoaderFCI(DataLoader):
-    """
-    1D data loader to load FCI data from .npy file 
-    """
-    
-    def __init__(self, dataset_path, result_folder=None):
-        super().__init__(dataset_path, result_folder)
         
-    def pipeline(self,**kwargs):
-        """Apply preprocessing and transform dataset to tensorflow dataset.
-        """
-        batch_size = kwargs.get("batch_size", 128)
-        shuffle = kwargs.get("shuffle", True)
-        split = kwargs.get("kwargs", 0.8)
-        filter = kwargs.get("filter", None)
-        proprecessing = kwargs.get("proprecessing", True)
+        if dataset is None:
+            x, y = self.get_x_y()
+            dataset = self.to_tensorflow_dataset((x,y))
         
-        if proprecessing:
-            if filter is not None: self.apply_mask(filter)   
-            self._normalize_data()
-        
-        train_dataset, test_dataset = self.to_dataset(batch_size, shuffle=shuffle, split=split)
-        
-        self.tf_dataset = {
-            "train_x"   : train_dataset.map(lambda x,y:x),
-            "val_x"     : test_dataset.map(lambda x,y:x),
-            "train_y"   : train_dataset.map(lambda x,y:y),
-            "val_y"     : test_dataset.map(lambda x,y:y)
-        }
-        
-        
-    def to_dataset(self, batch_size = 128, shuffle=True, split=0.8):
-        """ Shuffle, split, and convert to tf.data.Dataset object.
-        
-        Args:
-            data: A single array or a tuple (x, y) where x is the features and y is the labels.
-            batch_size: The batch size for the dataset.
-            shuffle: Whether to shuffle the data before splitting.
-            split: The proportion of the dataset to use for training (default is 0.8).
-        
-        Returns:
-            train_dataset: A tf.data.Dataset object for training.
-            test_dataset: A tf.data.Dataset object for testing.
-        """
-        x = self.dataset['data']
-        y = self.dataset['values']['gain']
-        
-        dataset = self._to_tensorflow_dataset((x,y))
-        
-
         if shuffle:
             dataset = dataset.shuffle(buffer_size=len(dataset))
         
@@ -139,10 +75,77 @@ class DataLoaderFCI(DataLoader):
             test_dataset = None
         
         return train_dataset, test_dataset
+            
     
-          
+    def to_tensorflow_dataset(self,data):
+        if isinstance(data, tuple):
+            x, y = data
+            dataset = tf.data.Dataset.from_tensor_slices((x, y))
+        else:
+            dataset = tf.data.Dataset.from_tensor_slices(data)
+        return(dataset)
+    
+    def _load_data(self):
+        """
+        Load dataset.
+        """
+        pass
+    
+    def _load_model(self):
+        """
+        Load model.
+        """
+        pass
+
+
+class DataLoaderFCI(DataLoader):
+    """
+    1D data loader to load FCI data from .npy file 
+    """
+    
+    def __init__(self, dataset_path, result_folder=None):
+        super().__init__(dataset_path, result_folder)
+        self._preprocessed = False
+        
+    def pipeline(self, **kwargs):
+        """Apply preprocessing and transform dataset to tensorflow dataset. 
+        Stores dataset in self.tf_dataset from vae training 
+        """
+        batch_size      = kwargs.get("batch_size", 128)
+        shuffle         = kwargs.get("shuffle", True)
+        split           = kwargs.get("split", 0.8)
+        filter          = kwargs.get("filter", None)
+        
+        if not self._preprocessed:
+            if filter is not None: self.apply_mask(filter)   
+            self._normalize_data()
+            self._preprocessed = True
+        
+        train_dataset, test_dataset = self.to_dataset(batch_size, shuffle=shuffle, split=split)
+        
+        if split > 0:
+            self.tf_dataset = {
+                "train_x"   : train_dataset.map(lambda x,y:x),
+                "val_x"     : test_dataset.map(lambda x,y:x),
+                "train_y"   : train_dataset.map(lambda x,y:y),
+                "val_y"     : test_dataset.map(lambda x,y:y)
+            }
+        elif split == 0:
+            self.tf_dataset = {
+                "train_x"   : train_dataset.map(lambda x,y:x),
+                "val_x"     : None,
+                "train_y"   : train_dataset.map(lambda x,y:y),
+                "val_y"     : None
+            }
+        
+        
+    def get_x_y(self, values = 'gain'):
+        x = self.dataset['data']
+        y = self.dataset['values'][values]
+        return(x,y)
+        
     def _normalize_data(self):
-        """Normalize data to be in the range [-1, 1].
+        """Normalize data to be in the range [0, 1].
         
         Returns:
             normalized_data: The normalized data.
@@ -159,6 +162,8 @@ class DataLoaderFCI(DataLoader):
         key = list(filter.keys())[0]
         gain_val = np.array(self.dataset['values'][key])
         mask = gain_val >= filter[key]
+        
+        print("TPTPTPPTPTPTTP",gain_val,filter[key])
 
         for key in self.dataset['values'].keys():
             self.dataset['values'][key] = np.array(self.dataset['values'][key])[mask]
@@ -168,8 +173,8 @@ class DataLoaderFCI(DataLoader):
 
         return None     
 
-    def get_shape(self,i):
-        return self.dataset['data'].shape[i]
+    def get_shape(self):
+        return self.dataset['data'].shape
 
     def _load_data(self) -> dict:
         """Load dataset from .npy file.
@@ -186,7 +191,6 @@ class DataLoaderFCI(DataLoader):
         
         self.dataset = loaded_dataset
     
-
     def _load_model(self) -> dict:
         """Load model.
         returns:
