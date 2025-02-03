@@ -40,7 +40,7 @@ if __name__ == '__main__':
         
     # Get VAE model
     model = ModelSelector()
-    model.select("1D")
+    model.select(vae = "1D-FCI", gain = '12MLP')
     
     trainer = Trainer_FCI(model, fci_dataset, config)
     trainer.train()

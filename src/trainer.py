@@ -22,6 +22,7 @@ class Trainer_FCI(Trainer):
         
     def train(self):
         self.train_vae()
+        self.train_gain('gain')
     
     def train_vae(self):
         config = self.config
@@ -36,6 +37,7 @@ class Trainer_FCI(Trainer):
         filtered = config["filter"]
         
         dataset = self.data_loader.get_tf_dataset()
+        self.dataset = dataset
 
         input_shape = self.data_loader.get_shape(1)
         latent_dim = latent_dim
@@ -44,13 +46,14 @@ class Trainer_FCI(Trainer):
         gain_loss = 0.
             
         # Get VAE model
-        autoencoder, encoder, decoder = self.model.get_model(
+        models = self.model.get_model(
             input_shape = (input_shape,1), 
             latent_dim=latent_dim,
             r_loss = r_loss,
             k_loss=k_loss,
             gain_loss=gain_loss
         )
+        autoencoder, encoder, decoder = models["vae"]
         
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
                     initial_learning_rate=0.001,
@@ -93,8 +96,9 @@ class Trainer_FCI(Trainer):
     
         # Saving latent space
         batch_size = 128
-        self.data_loader.pipeline(batch_size=batch_size,shuffle=False,split=0,filter = filtered)
-        dataset_batched = self.data_loader.get_tf_dataset()
+        data_ld_copy = self.data_loader
+        data_ld_copy.pipeline(batch_size=batch_size,shuffle=False,split=0,filter = filtered)
+        dataset_batched = data_ld_copy.get_tf_dataset()
         _, _, z = encoder.predict(dataset_batched["train_x"])
         np.savetxt(res_folder / 'latent_z.txt',z)
 
@@ -119,29 +123,27 @@ class Trainer_FCI(Trainer):
         if gain_only:
             res_folder = config["reprise"]["result_folder"]
             self.res_folder = res_folder
-            z = np.loadtxt(res_folder+'latent_z.txt')
-            self.data_loader = DataLoaderFCI(dataset_path)
-            self.data_loader.apply_mask(filtered)
-            loaded_dataset = self.data_loader.get_data()
+            z = np.loadtxt(res_folder / 'latent_z.txt')
+            loaded_dataset = self.data_loader.get_tf_dataset()
 
         else:
-            res_folder = self.res_folder
-            z = np.loadtxt(res_folder+'latent_z.txt')
-            loaded_dataset = self.dataset
+            results_path = Path(results_dir)
+            results_path.mkdir(parents=True, exist_ok=True)
+            folder_name = f"std_{name}_{self.data_loader.get_shape(0)}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}"
+            res_folder = results_path / folder_name
+            z = np.loadtxt(res_folder / 'latent_z.txt')
+            loaded_dataset = self.data_loader.get_tf_dataset()
 
-        np_gain = np.array(loaded_dataset['values']["gain"]) /  np.max(loaded_dataset['values']["gain"])
-            
-        if log:
-            norm_gain = np_gain
-            norm_gain = np.log(norm_gain)
-        else:
-            norm_gain = np_gain
-            
+
         res_folder_n = res_folder / "values" / var_name 
         
-        gain_batched_train_dataset,gain_batched_validation_dataset = self.data_loader.to_dataset((z,norm_gain),batch_size_rna,shuffle=True, split = 0.8)
-        ModelSelector = ModelSelector('1D')
-        latent_gain = ModelSelector.get_model(latent_dim)
+        gain_batched_train_dataset,gain_batched_validation_dataset = loaded_dataset["train_y"], loaded_dataset["val_y"]
+        
+        models = self.model.get_model(
+            latent_dim=latent_dim
+        )
+        
+        latent_gain = models["gain"]
 
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
                         initial_learning_rate=0.0005,
@@ -149,9 +151,9 @@ class Trainer_FCI(Trainer):
                         decay_rate=0.95,
                         staircase=False)
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)   
-        latent_gain.compile(optimizer=optimizer, loss=losses.MeanSquaredError(),metrics=['MAPE'])
+        latent_gain.compile(optimizer=optimizer, loss=tf.keras.losses.MeanSquaredError(),metrics=['MAPE'])
 
-        log_dir = res_folder_n + "logs"
+        log_dir = res_folder_n / "logs"
         tensorboard_callback = tf.keras.callbacks.TensorBoard(
             log_dir=log_dir
         )

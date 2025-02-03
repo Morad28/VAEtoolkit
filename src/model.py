@@ -8,20 +8,24 @@ from src.vae_class import VAE, Sampling
 
 class ModelSelector:
     def __init__(self):
-        self.model_name = "1D"
+        self.model_name = None
     
-    def select(self, model_name):
-        self.model_name = model_name
+    def select(self, **kwargs):
+        self.vae = kwargs.get('vae', None)
+        self.gain = kwargs.get('gain', None)
         
     def get_model(self,input_shape=(512,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.):
-        if self.model_name == '1D':
-            return self._get_1d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
-        elif self.model_name == '2D':
-            return self._get_2d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
-        elif self.model_name == 'gain_nn':
-            return self._get_gain_network(latent_dim)
+        s = {}
+        if self.vae == '1D-FCI':
+            s["vae"] = self._get_1d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
+        if self.vae == '2D':
+            s["vae"] = self._get_2d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
+        if self.gain == '12MLP':
+            s["gain"] = self._get_gain_network_12_mlp(latent_dim)
         else:
             raise ValueError('Model name not recognized')
+        print(s)
+        return s
         
     
     def _get_1d_vae(self, input_shape=(512,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.):
@@ -74,7 +78,7 @@ class ModelSelector:
         
         return autoencoder, encoder, decoder
 
-    def _get_2d_vae(self, input_shape=512, latent_dim=5, r_loss=0., k_loss=1., gain_loss=0.):
+    def _get_2d_vae(self, input_shape=(512,2), latent_dim=5, r_loss=0., k_loss=1., gain_loss=0.):
         """For training on 2D FCI target (non tested yet)
 
         Args:
@@ -87,7 +91,7 @@ class ModelSelector:
         Returns:
             Model: autoencoder
         """
-        inputs = Input(shape=(input_shape, 2))  # Adjusted for 2 input channels
+        inputs = Input(shape=input_shape)  # Adjusted for 2 input channels
         x = Conv1D(32, 3, activation='leaky_relu', padding='same', strides=2)(inputs)
         x = MaxPooling1D(pool_size=2)(x)
         x = Conv1D(64, 3, activation='leaky_relu', padding='same', strides=2)(x)
@@ -124,7 +128,7 @@ class ModelSelector:
 
         return autoencoder, encoder, decoder
     
-    def _get_gain_network(self,input_shape):
+    def _get_gain_network_12_mlp(self,input_shape):
 
         inputs = Input(shape=(input_shape,))
         x = Dense(64, activation='leaky_relu')(inputs)
