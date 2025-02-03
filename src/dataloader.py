@@ -6,6 +6,7 @@ from src.vae_class import Sampling, SamplingLayer
 import numpy as np
 
 
+
 class DataLoader:
     def __init__(self, config, result_folder=None):
         self.config = config
@@ -14,9 +15,10 @@ class DataLoader:
         self.dataset = None
         self.model = None
         self.tf_dataset = None
+        self.latent_space = None
         self._load_data()
         if result_folder is not None: self._load_model()
-        
+
     def pipeline(self,**kwargs):
         """Pipeline for data loading and preprocessing.
         """
@@ -103,8 +105,8 @@ class DataLoaderFCI(DataLoader):
     1D data loader to load FCI data from .npy file 
     """
     
-    def __init__(self, dataset_path, result_folder=None):
-        super().__init__(dataset_path, result_folder)
+    def __init__(self, config, result_folder=None):
+        super().__init__(config, result_folder)
         self._preprocessed = False
         
     def pipeline(self, **kwargs):
@@ -142,8 +144,6 @@ class DataLoaderFCI(DataLoader):
     def get_x_y(self, values = 'gain'):
         x = self.dataset['data']
         y = self.dataset['values'][values]
-
-        print("get",len(self.dataset['data']))
 
         return(x,y)
         
@@ -212,18 +212,18 @@ class DataLoaderFCI(DataLoader):
             relative_error = absolute_error / tf.maximum(tf.abs(y_true), 1e-7) # Add a small epsilon to prevent division by zero
             below_10_percent = tf.reduce_mean(tf.cast(relative_error < 0.1, tf.float32)) * 100
             return below_10_percent
-        
-        encoder = tf.keras.Model.load_model(os.path.join( self.result_folder, "model-encoder.keras"),
+    
+        encoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-encoder.keras"),
                                         custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
 
-        decoder = tf.keras.Model.load_model(os.path.join( self.result_folder, "model-decoder.keras"),
+        decoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder.keras"),
                                         custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
         
         latent_gain = {}
         l_dir = [item for item in os.listdir(self.result_folder+'/values') if not item.startswith('.')]
         for gain in l_dir:
             try:
-                latent_gain[gain] = tf.keras.Model.load_model(os.path.join(self.result_folder+'/values' , 
+                latent_gain[gain] = tf.keras.models.load_model(os.path.join(self.result_folder+'/values' , 
                                                                             f"{gain}/model.keras"),custom_objects={'below_10_percent':below_10_percent})
             except:
                 print(f'The folder {gain} is not a valid directory. Skipped')

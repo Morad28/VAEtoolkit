@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 from pathlib import Path
 import copy
+import json
 
 class Trainer:
     def __init__(self,model : ModelSelector, data_loader : DataLoader, config):
@@ -12,6 +13,8 @@ class Trainer:
         self.config = config
         self.results_path = None
         self.res_folder = None 
+
+        
         
     def _create_folder(self):
         results_dir = self.config["results_dir"]
@@ -23,6 +26,8 @@ class Trainer:
         results_path.mkdir(parents=True, exist_ok=True)
         folder_name = f"std_{name}_{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}"
         self.res_folder = results_path / folder_name
+        with open(self.res_folder / 'conf.json', "w") as file:
+            json.dump(self.config, file, indent=4)
     
     def _train_vae(self,x,y,models):
         

@@ -11,7 +11,7 @@ import tensorflow as tf
 import tkinter as tk
 from tkinter import ttk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from src.dataloader import DataLoaderFCI
+from src.dataloader import DataLoader
 from src.config_vae import get_config
 from scipy.optimize import differential_evolution
 import threading
@@ -22,7 +22,7 @@ class Postprocessing_Base:
         pass
 
 class PostprocessingVisualizer:
-    def __init__(self, root, data: DataLoaderFCI):
+    def __init__(self, root, data: DataLoader):
         
         self.root = root
         self.data = data
@@ -30,12 +30,12 @@ class PostprocessingVisualizer:
         self.config = get_config(self.data.result_folder + '/conf.json')
         filtered = self.config["filter"]
 
-        self.latent_space = data.latent_space
+        self.latent_space = data.model["latent_space"]
         self.gain = data.dataset['values']
         self.time = data.dataset['time']
-        self.encoder = data.encoder
-        self.decoder = data.decoder
-        self.rna_gain = data.latent_gain
+        self.encoder = data.model["encoder"]
+        self.decoder = data.model["decoder"]
+        self.rna_gain = data.model["latent_gain"]
         
         self.vae_norm = self.data.vae_norm 
         self.gain_norm = self.data.gain_norm 

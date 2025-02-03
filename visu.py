@@ -4,9 +4,11 @@ import numpy as np
 import matplotlib.pyplot as plt 
 from src.dataloader import DataLoaderFCI
 import argparse
+from src.config_vae import get_config
+import os
 
 # import os 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         
 
 def main():    
@@ -16,7 +18,7 @@ def main():
     args = parser.parse_args()
 
     data = DataLoaderFCI(
-        dataset_path=args.dataset_path,
+        get_config("./conf.json"),
         result_folder=args.result_folder
     )
 
