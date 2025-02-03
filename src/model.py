@@ -127,7 +127,7 @@ class ModelSelector:
 
         return autoencoder, encoder, decoder
     
-    def _get_gain_network_12_mlp(self,input_shape):
+    def _get_gain_network_12_mlp(self,input_shape, output_shape = 1):
 
         inputs = Input(shape=(input_shape,))
         x = Dense(64, activation='leaky_relu')(inputs)
@@ -142,7 +142,7 @@ class ModelSelector:
         x = Dense(128, activation='leaky_relu')(x)
         x = Dense(64, activation='leaky_relu')(x)
         x = Dense(64, activation='leaky_relu')(x)
-        decoded = Dense(1)(x)
+        decoded = Dense(output_shape)(x)
             
-        model = tf.keras.Model(inputs,  decoded, name='decoder')
+        model = tf.keras.Model(inputs,  decoded, name='12MLP')
         return(model) 
