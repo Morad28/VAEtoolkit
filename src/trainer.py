@@ -3,6 +3,7 @@ from src.model import ModelSelector
 import numpy as np
 import tensorflow as tf
 from pathlib import Path
+import copy
 
 class Trainer:
     def __init__(self,model : ModelSelector, data_loader : DataLoader, config):
@@ -96,8 +97,8 @@ class Trainer_FCI(Trainer):
     
         # Saving latent space
         batch_size = 128
-        data_ld_copy = self.data_loader
-        data_ld_copy.pipeline(batch_size=batch_size,shuffle=False,split=0,filter = filtered)
+        data_ld_copy = copy.deepcopy(self.data_loader)
+        data_ld_copy.pipeline(batch_size=batch_size, shuffle=False, split=0, filter = filtered, preprocessing = False)
         dataset_batched = data_ld_copy.get_tf_dataset()
         _, _, z = encoder.predict(dataset_batched["train_x"])
         np.savetxt(res_folder / 'latent_z.txt',z)

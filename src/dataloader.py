@@ -83,9 +83,12 @@ class DataLoaderFCI(DataLoader):
         shuffle = kwargs.get("shuffle", True)
         split = kwargs.get("kwargs", 0.8)
         filter = kwargs.get("filter", None)
+        proprecessing = kwargs.get("proprecessing", True)
         
-        if filter is not None: self.apply_mask(filter)   
-        self._normalize_data()
+        if proprecessing:
+            if filter is not None: self.apply_mask(filter)   
+            self._normalize_data()
+        
         train_dataset, test_dataset = self.to_dataset(batch_size, shuffle=shuffle, split=split)
         
         self.tf_dataset = {
