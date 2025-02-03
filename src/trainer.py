@@ -204,6 +204,6 @@ class Trainer_FCI(Trainer):
             latent_dim=latent_dim
         )
 
-        history = self._train_mlp(gain_batched_train_dataset,gain_batched_validation_dataset,models)
+        history = self._train_mlp(gain_batched_train_dataset,gain_batched_validation_dataset,models,res_folder_n=res_folder_n)
 
         return history
