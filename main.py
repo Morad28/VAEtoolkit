@@ -20,8 +20,11 @@ from keras import losses
 matplotlib.use('Agg')
 cmap = matplotlib.colormaps['viridis']  
 
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 if __name__ == '__main__':
-    config_path = sys.argv[1]
+    # config_path = sys.argv[1]
+    config_path = "conf.json"
     config = get_config(config_path)
     
     # # Access parameters

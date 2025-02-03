@@ -33,7 +33,7 @@ class DataLoader:
     def get_model(self):
         return self.model
     
-    def get_x_y():
+    def get_x_y(self):
         pass
     
     def to_dataset(self, batch_size = 128, shuffle=True, split=0.8, dataset = None):
@@ -116,8 +116,8 @@ class DataLoaderFCI(DataLoader):
         split           = kwargs.get("split", 0.8)
         filter          = kwargs.get("filter", None)
         
+        if filter is not None: self.apply_mask(filter)   
         if not self._preprocessed:
-            if filter is not None: self.apply_mask(filter)   
             self._normalize_data()
             self._preprocessed = True
         
@@ -142,6 +142,9 @@ class DataLoaderFCI(DataLoader):
     def get_x_y(self, values = 'gain'):
         x = self.dataset['data']
         y = self.dataset['values'][values]
+
+        print("get",len(self.dataset['data']))
+
         return(x,y)
         
     def _normalize_data(self):
@@ -157,9 +160,13 @@ class DataLoaderFCI(DataLoader):
         self.dataset['data'] = self.dataset['data'] / np.max(self.dataset['data'])
         for key in self.dataset['values'].keys():
             self.dataset['values'][key] = np.array(self.dataset['values'][key]) / (np.max(self.dataset['values'][key]))
+
+        print(len(self.dataset['data']))
+        
         
     def apply_mask(self,filter):
         key = list(filter.keys())[0]
+        print("key",key)
         gain_val = np.array(self.dataset['values'][key])
         mask = gain_val >= filter[key]
         
@@ -171,7 +178,8 @@ class DataLoaderFCI(DataLoader):
         self.dataset['data'] = np.array(self.dataset['data'])[mask]
         self.dataset['name'] = np.array(self.dataset['name'])[mask]
 
-        return None     
+        print(len(self.dataset['data']))
+
 
     def get_shape(self):
         return self.dataset['data'].shape

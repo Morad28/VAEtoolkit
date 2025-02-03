@@ -92,13 +92,14 @@ class Trainer_FCI(Trainer):
         
         self.data_loader.pipeline(
             batch_size = batch_size_vae,
-            filtered = filtered,
+            filter = filtered,
             shuffle = True,
             split = 0.8
         )
         
         dataset = self.data_loader.get_tf_dataset()
         self.dataset = dataset
+
 
         input_shape = self.data_loader.get_shape()[1]
         r_loss = 1.
@@ -155,10 +156,8 @@ class Trainer_FCI(Trainer):
             z = np.loadtxt(res_folder / 'latent_z.txt')
 
 
-        print(self.data_loader.get_shape())
 
         _, gain = self.data_loader.get_x_y(var_name)
-        print(gain.shape)
     
         gain_dataset = self.data_loader.to_tensorflow_dataset((z,gain))
 
@@ -166,7 +165,6 @@ class Trainer_FCI(Trainer):
         
         gain_batched_train_dataset,gain_batched_validation_dataset = self.data_loader.to_dataset(dataset=gain_dataset)
         
-        print(gain_batched_train_dataset)
         
         models = self.model.get_model(
             latent_dim=latent_dim
@@ -203,4 +201,4 @@ class Trainer_FCI(Trainer):
             callbacks=callbacks,
             verbose = 2)
 
-        latent_gain.save(res_folder_n + "model.keras")
+        latent_gain.save(res_folder_n / "model.keras")
