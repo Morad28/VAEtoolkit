@@ -13,13 +13,208 @@ from tkinter import ttk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from src.dataloader import DataLoader
 from src.config_vae import get_config
-from scipy.optimize import differential_evolution
 import threading
 from tkinter import messagebox
 
-class Postprocessing_Base:
-    def __init__(self):
-        pass
+class PostprocessingBase:
+    def __init__(self, root, data_loader):
+        self.root = root
+        self.data_loader = data_loader
+        self._initialize_config()
+        self._initialize_model_components()
+        self._setup_ui()
+
+    def _initialize_config(self):
+        """Load and initialize configuration."""
+        self.config = get_config(self.data_loader.result_folder + '/conf.json')
+        self.filtered = self.config.get("filter", {})  # Use .get() to avoid KeyError
+
+    def _initialize_model_components(self):
+        """Initialize model-related components."""
+        self.latent_space = self.data_loader.model["latent_space"]
+        self.encoder = self.data_loader.model["encoder"]
+        self.decoder = self.data_loader.model["decoder"]
+        self.vae_norm = self.data_loader.vae_norm
+        self.dim = self.latent_space.shape[1]
+        self._area = []
+
+    def _setup_ui(self):
+        """Set up the Tkinter UI."""
+        self.root.title("Interactive Visualization")
+        self._setup_control_frame()
+        self._setup_plot_frame()
+        self._setup_detail_window()
+        self._bind_events()
+        self.plot_main()
+
+    def _setup_control_frame(self):
+        """Set up the control frame with widgets."""
+        control_frame = tk.Frame(self.root)
+        control_frame.pack(side=tk.LEFT, fill=tk.Y)
+
+        self._add_axis_selection(control_frame)
+        self._add_pca_settings(control_frame)
+        self._add_grid_size_setting(control_frame)
+        self._add_buttons(control_frame)
+
+    def _add_axis_selection(self, parent):
+        """Add X and Y axis selection widgets."""
+        tk.Label(parent, text="X-axis:").pack(side=tk.TOP)
+        self.x_axis_var = tk.IntVar(value=0)
+        self._add_spinbox(parent, self.x_axis_var, "update_axes")
+
+        tk.Label(parent, text="Y-axis:").pack(side=tk.TOP)
+        self.y_axis_var = tk.IntVar(value=1)
+        self._add_spinbox(parent, self.y_axis_var, "update_axes")
+
+    def _add_spinbox(self, parent, variable, command):
+        """Helper function to add a spinbox."""
+        spinbox = ttk.Spinbox(parent, from_=0, to=self.dim - 1, textvariable=variable, command=getattr(self, command), width=3)
+        spinbox.pack(side=tk.TOP)
+
+    def _add_pca_settings(self, parent):
+        """Add PCA-related settings."""
+        tk.Label(parent, text="PCA dim:").pack(side=tk.TOP)
+        self._pca_dim = tk.IntVar(value=2)
+        tk.Entry(parent, textvariable=self._pca_dim, width=3).pack(side=tk.TOP)
+
+        tk.Label(parent, text="Enable PCA:").pack(side=tk.TOP)
+        self.enablePCA = tk.BooleanVar(value=False)
+        tk.Checkbutton(parent, text="Enable", variable=self.enablePCA, command=self.update_axes).pack(side=tk.TOP)
+
+    def _add_grid_size_setting(self, parent):
+        """Add grid size setting."""
+        tk.Label(parent, text="N:").pack(side=tk.TOP)
+        self._N = tk.IntVar(value=50)
+        tk.Entry(parent, textvariable=self._N, width=3).pack(side=tk.TOP)
+
+    def _add_buttons(self, parent):
+        """Add action buttons."""
+        tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)
+        tk.Button(parent, text="Optimize", command=self.find_best).pack(pady=10)
+        tk.Button(parent, text="Slices", command=self.show_latent_space).pack(pady=5)
+        tk.Button(self.root, text="Quit", command=self.quit_app).pack(pady=10)
+
+    def _setup_plot_frame(self):
+        """Set up the main plot frame."""
+        fig_frame = tk.Frame(self.root)
+        fig_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        self.fig_main, self.ax_main = plt.subplots()
+        self.canvas_main = FigureCanvasTkAgg(self.fig_main, master=fig_frame)
+        self.canvas_main.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+    def _setup_detail_window(self):
+        """Set up the detail plot window."""
+        self.detail_window = tk.Toplevel(self.root)
+        self.detail_window.title("Detail Plot")
+        self.fig_detail, self.ax_detail = plt.subplots()
+        self.canvas_detail = FigureCanvasTkAgg(self.fig_detail, master=self.detail_window)
+        self.canvas_detail.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+    def _bind_events(self):
+        """Bind mouse events to the canvas."""
+        self.canvas_main.mpl_connect("button_press_event", self.on_click)
+        self.canvas_main.mpl_connect("button_press_event", self.on_press)
+        self.canvas_main.mpl_connect("motion_notify_event", self.on_motion)
+        self.canvas_main.mpl_connect("button_release_event", self.on_release)
+        self.drawing = False  # Track if the mouse is pressed
+
+    def get_label(self):
+        """Get the name of the label and value
+        """
+        raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
+        
+    def plot_main(self):
+        self.ax_main.clear()
+        
+        gg = self.get_label()
+        
+        self._pca = PCA(n_components=self._pca_dim.get())
+
+        if self.enablePCA.get():
+            latent_space = self._pca.fit_transform(self.latent_space)
+            explained_var = self._pca.explained_variance_ratio_
+            sc = self.ax_main.scatter(latent_space[:, self.axis_x], latent_space[:, self.axis_y], c = gg)
+            self.ax_main.set_xlabel(f"Dimension {self.axis_x} ({explained_var[self.axis_x]:.2f})")
+            self.ax_main.set_ylabel(f"Dimension {self.axis_y} ({explained_var[self.axis_y]:.2f})")
+
+        else:
+            sc = self.ax_main.scatter(self.latent_space[:, self.axis_x], self.latent_space[:, self.axis_y], c = gg)
+            self.ax_main.set_xlabel(f"Dimension {self.axis_x}")
+            self.ax_main.set_ylabel(f"Dimension {self.axis_y}")
+            
+        if hasattr(self, 'scatter_cb'):
+            self.scatter_cb.update_normal(sc)
+        else:
+            self.scatter_cb = self.fig_main.colorbar(sc, ax=self.ax_main)
+
+        self.canvas_main.draw()
+
+    def on_click(self, event):
+        
+        if len(self._area) == 2:
+            self._area.pop(0)
+        self._area.append([event.xdata, event.ydata])
+        
+        if event.inaxes == self.ax_main or event.inaxes == self.ax_mapping:
+            coord =  [event.xdata, event.ydata] 
+            self.plot_detail(coord)
+            
+    def on_press(self, event):
+        self.drawing = True
+        self.update_area(event)
+
+    def on_motion(self, event):
+        if self.drawing:
+            self.update_area(event)
+
+    def on_release(self, event):
+        self.drawing = False
+
+    def update_area(self, event):
+        if event.inaxes == self.ax_main or event.inaxes == self.ax_mapping:
+            coord = [event.xdata, event.ydata]
+            self.plot_detail(coord)
+            
+    
+    def plot_detail(self, coord):
+        # Create a detailed plot in the second figure based on clicked coordinates
+        self.ax_detail.clear()
+        
+        gain_entry = self.gain_entry.get()
+        
+        if self.enablePCA.get():
+            dim = self._pca_dim.get()
+        else:
+            dim = self.dim
+        
+        axis = []
+        
+        for i in list(set(range(dim)) - {self.axis_x, self.axis_y}):
+            axis.append(i)
+        
+        latent_point = np.zeros((1,dim))
+        latent_point[0,self.axis_x] = coord[0]
+        latent_point[0,self.axis_y] = coord[1]
+        if self.x_max is not None and len(axis)>0:
+            for a in axis:
+                latent_point[0,a] = self.x_max[a]
+        
+        if self.enablePCA.get():
+            latent_point = self._pca.inverse_transform(latent_point[0]).reshape(1,self.dim)
+        else:
+            dim = self.dim
+
+        laser = self.decoder.predict(latent_point,verbose=0)[0]
+        gain_val = self.rna_gain[gain_entry].predict(latent_point,verbose=0)
+        gain_val = self.gain_norm[gain_entry] * (gain_val)
+    
+        self.ax_detail.plot(self.time, laser * self.vae_norm, label=f" {gain_entry}={gain_val}")
+        self.ax_detail.set_title("Profiles")
+        self.ax_detail.legend()
+        self.canvas_detail.draw()
+
 
 class PostprocessingVisualizer:
     def __init__(self, root, data: DataLoader):
