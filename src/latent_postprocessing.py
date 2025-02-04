@@ -122,6 +122,21 @@ class PostprocessingBase:
 
     def get_label(self):
         """Get the name of the label and value
+        
+        returns:
+        --------
+        label: str
+        value: numpy array
+        """
+        
+        raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
+    
+    def get_latent_space(self):
+        """Get the latent space
+        
+        returns:
+        --------
+        numpy array
         """
         raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
         
@@ -216,152 +231,10 @@ class PostprocessingBase:
         self.canvas_detail.draw()
 
 
-class PostprocessingVisualizer:
+class PostprocessingFCI(PostprocessingBase):
     def __init__(self, root, data: DataLoader):
-        
-        self.root = root
-        self.data = data
-
-        self.config = get_config(self.data.result_folder + '/conf.json')
-        filtered = self.config["filter"]
-
-        self.latent_space = data.model["latent_space"]
-        self.gain = data.dataset['values']
-        self.time = data.dataset['time']
-        self.encoder = data.model["encoder"]
-        self.decoder = data.model["decoder"]
-        self.rna_gain = data.model["latent_gain"]
-        
-        self.vae_norm = self.data.vae_norm 
-        self.gain_norm = self.data.gain_norm 
-
-        key = list(filtered.keys())[0]
-        gain_val = np.array(self.gain[key])
-        mask = gain_val >= filtered[key]
-
-        for key in self.gain.keys():
-            self.gain[key] = np.array(self.gain[key])[mask]
-
-
-        self.axis_x, self.axis_y = 0, 1  # Default dimensions to plot
-        self._N = 50
-        self.index = 0
-        
-        self._area = []
-        self.x_max = None
-
-        self.dim = self.latent_space.shape[1]
-        
-        # Setup main Tkinter window and frames
-        self.root = root
-        self.root.title("Interactive Visualization")
-        
-        # Frame for controls
-        control_frame = tk.Frame(root)
-        control_frame.pack(side=tk.LEFT, fill=tk.Y)
-        
-        # Axis selection dropdowns
-        tk.Label(control_frame, text="X-axis:").pack(side=tk.TOP)
-        self.x_axis_var = tk.IntVar(value=self.axis_x)
-        x_axis_spinbox = ttk.Spinbox(control_frame, from_=0, to=self.dim-1, textvariable=self.x_axis_var, command=self.update_axes, width=3)
-        x_axis_spinbox.pack(side=tk.TOP)
-
-        tk.Label(control_frame, text="Y-axis:").pack(side=tk.TOP)
-        self.y_axis_var = tk.IntVar(value=self.axis_y)
-        y_axis_spinbox = ttk.Spinbox(control_frame, from_=0, to=self.dim-1, textvariable=self.y_axis_var, command=self.update_axes, width=3)
-        y_axis_spinbox.pack(side=tk.TOP)
-        
-        # Integer entry label and widget
-        tk.Label(control_frame, text="PCA dim :").pack(side=tk.TOP)
-        self._pca_dim = tk.IntVar(value=2)  # Default integer value
-        int_entry = tk.Entry(control_frame, textvariable=self._pca_dim, width=3)
-        int_entry.pack(side=tk.TOP)
-       
-        tk.Label(control_frame, text="Enable PCA :").pack(side=tk.TOP)
-        self.enablePCA = tk.BooleanVar(value=False) # Default to PCA enabled
-        enablePCA_checkbutton = tk.Checkbutton(control_frame, text="Enable", variable=self.enablePCA, command=self.update_axes)
-        enablePCA_checkbutton.pack(side=tk.TOP)
-        
-        options = list(self.gain.keys())
-        tk.Label(control_frame, text="Select value").pack(side=tk.TOP)
-        self.gain_entry = tk.StringVar(value="gain") # Default to heatmap based on gain
-        self.gain_entry.trace_add("write", self.plot_main)
-        gain_entry_menu = tk.OptionMenu(control_frame, self.gain_entry, *options)
-        gain_entry_menu.pack(side=tk.TOP)
-
-        # Integer entry label and widget
-        tk.Label(control_frame, text="N:").pack(side=tk.TOP)
-        self._N = tk.IntVar(value=50)  # Default integer value
-        int_entry = tk.Entry(control_frame, textvariable=self._N, width=3)
-        int_entry.pack(side=tk.TOP)
-        
-        self.quit_button = tk.Button(control_frame, text="mapping", command=self.plot_mapping)
-        self.quit_button.pack(pady=10)       
-        
-        self.quit_button = tk.Button(control_frame, text="optimize", command=self.find_best)
-        self.quit_button.pack(pady=10)   
-        
-        # Frame for matplotlib figure
-        fig_frame = tk.Frame(root)
-        fig_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-        
-        # Create main matplotlib figure and canvas
-        self.fig_main, self.ax_main = plt.subplots()
-        self.canvas_main = FigureCanvasTkAgg(self.fig_main, master=fig_frame)
-        self.canvas_main.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-        
-        # Bind events
-        self.canvas_main.mpl_connect("button_press_event", self.on_click)
-        self.canvas_main.mpl_connect("button_press_event", self.on_press)
-        self.canvas_main.mpl_connect("motion_notify_event", self.on_motion)
-        self.canvas_main.mpl_connect("button_release_event", self.on_release)
-        
-        self.drawing = False  # Track if the mouse is pressed
-        
-        # Add a button to open the input window
-        # self.prepro = ttk.Button(root, text="Preprocess data", command=self.preprocessing)
-        # self.prepro.pack(pady=5)
-        # self.prepro_window = None
-        # self.preprocessing_map = {key: lambda x: x for key in self.gain}
-        
-        # Create a secondary window for the detail plot
-        self.detail_window = tk.Toplevel(root)
-        self.detail_window.title("Detail Plot")
-        self.fig_detail, self.ax_detail = plt.subplots()
-        self.canvas_detail = FigureCanvasTkAgg(self.fig_detail, master=self.detail_window)
-        self.canvas_detail.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-        
-        self.save_latent_space = tk.Button(control_frame, text="slices", command=self.show_latent_space)
-        self.save_latent_space.pack(pady=5)
-        
-        self.quit_button = tk.Button(self.root, text="Quit", command=self.quit_app)
-        self.quit_button.pack(pady=10)  
-             
-        # Handle window close (X button)
-        self.root.protocol("WM_DELETE_WINDOW", self.quit_app)
-        
-        # Initial plot
-        self.plot_main()
-
-    def preprocessing(self):
-        if self.prepro_window is not None: return
-        
-        self.prepro_window = tk.Toplevel(self.root)
-        self.prepro_window.title("Preprocessing")
-        self.prepro_window.geometry('200x300')
-        self.prepro_window.protocol("WM_DELETE_WINDOW", self.close_input_window)
-
-        self.entries = {}
-        for key in self.gain:
-            label = ttk.Label(self.prepro_window, text=f"Input for {key}:") 
-            label.pack(anchor="w", padx=10, pady=5)
-            entry = ttk.Entry(self.prepro_window)
-            entry.pack(fill=tk.X, padx=10, pady=2)
-            self.entries[key] = entry
-
-        # Add an "Update Plots" button
-        update_button = ttk.Button(self.prepro_window, text="Update", command=self.update_preprocessing)
-        update_button.pack(pady=10)
+        super().__init__(root, data)
+ 
     
     def update_preprocessing(self):
         for key in self.gain:
