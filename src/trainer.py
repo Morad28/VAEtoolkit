@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 from pathlib import Path
 import copy
+import os
 import json
 
 class Trainer:
@@ -13,7 +14,11 @@ class Trainer:
         self.config = config
         self.results_path = None
         self.res_folder = None 
+        self._prepare_data()
 
+        
+    def _prepare_data(self):
+        self.data_loader.pipeline()
         
         
     def _create_folder(self):
@@ -26,6 +31,7 @@ class Trainer:
         results_path.mkdir(parents=True, exist_ok=True)
         folder_name = f"std_{name}_{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}"
         self.res_folder = results_path / folder_name
+        os.makedirs(os.path.dirname(self.res_folder / 'conf.json'), exist_ok=True)
         with open(self.res_folder / 'conf.json', "w") as file:
             json.dump(self.config, file, indent=4)
     
@@ -47,9 +53,7 @@ class Trainer:
         autoencoder.compile(optimizer=optimizer)
         
         log_dir = self.res_folder / "logs"
-        tensorboard_callback = tf.keras.callbacks.TensorBoard(
-        log_dir=log_dir
-        )
+        tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir)
 
         callbacks=[
             tensorboard_callback
@@ -85,22 +89,12 @@ class Trainer:
         latent_gain.compile(optimizer=optimizer, loss=tf.keras.losses.MeanSquaredError(),metrics=['MAPE'])
 
         log_dir = res_folder_n / "logs"
-        tensorboard_callback = tf.keras.callbacks.TensorBoard(
-            log_dir=log_dir
-        )
-        callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50)
+        tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir)
 
-
-        callbacks=[
-            # callback,
-            tensorboard_callback]
-
-
-        epoch = epoch_rna
-
+        callbacks=[tensorboard_callback]
 
         history = latent_gain.fit(x,
-            epochs=epoch, 
+            epochs=epoch_rna, 
             validation_data=y,
             callbacks=callbacks,
             verbose = 2)
@@ -116,47 +110,34 @@ class Trainer:
         pass
     
     
-class Trainer_FCI(Trainer):
+class TrainerFCI(Trainer):
     def __init__(self,model : ModelSelector, data_loader : DataLoader, config):
         super().__init__(model, data_loader, config)
         self.res_folder = None
-        self.dataset = None
-        self._raw_data = copy.deepcopy(self.data_loader)
         
     def train(self):
-        self.train_vae()
+        gain_only = self.config["reprise"]["gain_only"]
+        
+        if not gain_only:
+            self.train_vae()
+
         self.train_gain('gain')
     
     def train_vae(self):
         config = self.config
-        # Access parameters
-        filtered = config["filter"]
         kl_loss = config["kl_loss"]
         latent_dim =  config["latent_dim"]
-        batch_size_vae = config["batch_size_vae"]
-        
-        self.data_loader.pipeline(
-            batch_size = batch_size_vae,
-            filter = filtered,
-            shuffle = True,
-            split = 0.8
-        )
         
         dataset = self.data_loader.get_tf_dataset()
-        self.dataset = dataset
 
         input_shape = self.data_loader.get_shape()[1]
-        r_loss = 1.
-        k_loss = kl_loss 
-        gain_loss = 0.
+        print(self.data_loader.get_shape())
             
         # Get VAE model
         models = self.model.get_model(
             input_shape = (input_shape,1), 
             latent_dim  = latent_dim,
-            r_loss      = r_loss,
-            k_loss      = k_loss,
-            gain_loss   = gain_loss
+            k_loss      = kl_loss
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
@@ -164,9 +145,8 @@ class Trainer_FCI(Trainer):
     
         # Saving latent space
         batch_size = 256
-        self._raw_data.pipeline(batch_size=batch_size, shuffle=False, split=0, filter = filtered)
-        dataset_batched = self._raw_data.get_tf_dataset()
-        _, _, z = encoder.predict(dataset_batched["train_x"])
+        dataset_batched, _ = self.data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
+        _, _, z = encoder.predict(dataset_batched)
         np.savetxt(self.res_folder / 'latent_z.txt',z)
         return history
 
@@ -183,7 +163,7 @@ class Trainer_FCI(Trainer):
         batch_size_vae = config["batch_size_vae"]
         
         if gain_only:
-            res_folder = config["reprise"]["result_folder"]
+            res_folder = Path(config["reprise"]["result_folder"])
             self.res_folder = res_folder
             z = np.loadtxt(res_folder / 'latent_z.txt')
 
@@ -211,4 +191,40 @@ class Trainer_FCI(Trainer):
 
         history = self._train_mlp(gain_batched_train_dataset,gain_batched_validation_dataset,models,res_folder_n=res_folder_n)
 
+        return history
+    
+    
+class TrainerMNIST(Trainer):
+    def __init__(self,model : ModelSelector, data_loader : DataLoader, config):
+        super().__init__(model, data_loader, config)
+        
+    def train(self):
+        self.train_vae()
+
+    
+    def train_vae(self):
+        config = self.config
+        kl_loss = config["kl_loss"]
+        latent_dim =  config["latent_dim"]
+        
+        dataset = self.data_loader.get_tf_dataset()
+
+        input_shape = self.data_loader.get_shape()
+        print(self.data_loader.get_shape())
+            
+        # Get VAE model
+        models = self.model.get_model(
+            input_shape = input_shape, 
+            latent_dim  = latent_dim,
+            k_loss      = kl_loss
+        )
+        
+        history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
+        _, encoder, _ = models["vae"]
+    
+        # Saving latent space
+        batch_size = 256
+        dataset_batched, _ = self.data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
+        _, _, z = encoder.predict(dataset_batched)
+        np.savetxt(self.res_folder / 'latent_z.txt',z)
         return history

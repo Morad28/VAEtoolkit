@@ -1,13 +1,14 @@
 import numpy as np
 import os
 import tensorflow as tf
-from tensorflow import keras
 from src.vae_class import Sampling, SamplingLayer
 import numpy as np
 
-
-
 class DataLoader:
+    """
+    Abstract class for loading and preprocessing data.
+    
+    """
     def __init__(self, config, result_folder=None):
         self.config = config
         self.dataset_path = config["dataset_path"]
@@ -16,14 +17,61 @@ class DataLoader:
         self.model = None
         self.tf_dataset = None
         self.latent_space = None
-        self._load_data()
-        if result_folder is not None: self._load_model()
+        self.vae_norm = 1.
+        self.dataset = self._load_data()
+        if result_folder is not None: 
+            self.model = self._load_model()
 
-    def pipeline(self,**kwargs):
-        """Pipeline for data loading and preprocessing.
+    def _load_data(self) -> dict:
         """
-        pass
-                
+        Load dataset.
+        """
+        raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
+    
+    def _load_model(self) -> dict:
+        """
+        Load model. 
+        """
+        raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
+
+    def get_x_y(self):
+        """Get x data and y data (gain for FCI, labels, ...)
+        """
+        raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
+    
+    def preprocessing(self):
+        """preprocessing of data. Normalization or other stuff.
+        """
+        raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
+
+    
+    def pipeline(self):
+        """Apply preprocessing and transform dataset to tensorflow dataset. 
+        Stores dataset in self.tf_dataset for vae training.
+        """
+        batch_size      = self.config.get("batch_size", 128)
+        shuffle         = self.config.get("shuffle", True)
+        split           = self.config.get("split", 0.8)
+        
+        self.preprocessing()
+        
+        train_dataset, test_dataset = self.to_dataset(batch_size, shuffle=shuffle, split=split)
+        
+        if split > 0:
+            self.tf_dataset = {
+                "train_x"   : train_dataset.map(lambda x,y:x),
+                "val_x"     : test_dataset.map(lambda x,y:x),
+                "train_y"   : train_dataset.map(lambda x,y:y),
+                "val_y"     : test_dataset.map(lambda x,y:y)
+            }
+        elif split == 0:
+            self.tf_dataset = {
+                "train_x"   : train_dataset.map(lambda x,y:x),
+                "val_x"     : None,
+                "train_y"   : train_dataset.map(lambda x,y:y),
+                "val_y"     : None
+            }
+            
     def get_data(self):
         """Get data.
         """
@@ -35,8 +83,6 @@ class DataLoader:
     def get_model(self):
         return self.model
     
-    def get_x_y(self):
-        pass
     
     def to_dataset(self, batch_size = 128, shuffle=True, split=0.8, dataset = None):
         """ Shuffle, split, and convert to tf.data.Dataset object.
@@ -87,17 +133,6 @@ class DataLoader:
             dataset = tf.data.Dataset.from_tensor_slices(data)
         return(dataset)
     
-    def _load_data(self):
-        """
-        Load dataset.
-        """
-        pass
-    
-    def _load_model(self):
-        """
-        Load model.
-        """
-        pass
 
 
 class DataLoaderFCI(DataLoader):
@@ -109,36 +144,12 @@ class DataLoaderFCI(DataLoader):
         super().__init__(config, result_folder)
         self._preprocessed = False
         
-    def pipeline(self, **kwargs):
-        """Apply preprocessing and transform dataset to tensorflow dataset. 
-        Stores dataset in self.tf_dataset from vae training 
-        """
-        batch_size      = kwargs.get("batch_size", 128)
-        shuffle         = kwargs.get("shuffle", True)
-        split           = kwargs.get("split", 0.8)
-        filter          = kwargs.get("filter", None)
-        
+    def preprocessing(self):
+        filter          = self.config.get("filter", None)
         if filter is not None: self.apply_mask(filter)   
         if not self._preprocessed:
             self._normalize_data()
             self._preprocessed = True
-        
-        train_dataset, test_dataset = self.to_dataset(batch_size, shuffle=shuffle, split=split)
-        
-        if split > 0:
-            self.tf_dataset = {
-                "train_x"   : train_dataset.map(lambda x,y:x),
-                "val_x"     : test_dataset.map(lambda x,y:x),
-                "train_y"   : train_dataset.map(lambda x,y:y),
-                "val_y"     : test_dataset.map(lambda x,y:y)
-            }
-        elif split == 0:
-            self.tf_dataset = {
-                "train_x"   : train_dataset.map(lambda x,y:x),
-                "val_x"     : None,
-                "train_y"   : train_dataset.map(lambda x,y:y),
-                "val_y"     : None
-            }
         
         
     def get_x_y(self, values = 'gain'):
@@ -160,36 +171,27 @@ class DataLoaderFCI(DataLoader):
         self.dataset['data'] = self.dataset['data'] / np.max(self.dataset['data'])
         for key in self.dataset['values'].keys():
             self.dataset['values'][key] = np.array(self.dataset['values'][key]) / (np.max(self.dataset['values'][key]))
-
-        print(len(self.dataset['data']))
-        
         
     def apply_mask(self,filter):
         key = list(filter.keys())[0]
-        print("key",key)
         gain_val = np.array(self.dataset['values'][key])
         mask = gain_val >= filter[key]
         
-        print("TPTPTPPTPTPTTP",gain_val,filter[key])
-
         for key in self.dataset['values'].keys():
             self.dataset['values'][key] = np.array(self.dataset['values'][key])[mask]
         
         self.dataset['data'] = np.array(self.dataset['data'])[mask]
         self.dataset['name'] = np.array(self.dataset['name'])[mask]
 
-        print(len(self.dataset['data']))
 
-
-    def get_shape(self):
-        return self.dataset['data'].shape
+    def get_shape(self, dim = 1):
+        return (self.dataset['data'].shape[1], dim)
 
     def _load_data(self) -> dict:
         """Load dataset from .npy file.
         """
 
         loaded_dataset = np.load(self.dataset_path, allow_pickle=True).item()
-        
         self.vae_norm = np.max(loaded_dataset["data"])
         
         
@@ -197,14 +199,14 @@ class DataLoaderFCI(DataLoader):
         for key in loaded_dataset["values"]:
             self.gain_norm[key] = np.max(loaded_dataset["values"][key])
         
-        self.dataset = loaded_dataset
+        return(loaded_dataset)
     
     def _load_model(self) -> dict:
         """Load model.
         returns:
-            encoder (tf.keras.Model): Encoder model.
-            decoder (tf.keras.Model): Decoder model.
-            latent_gain (dict(str, tf.keras.Model)): Dictionary of the gain ANNs for prediction.
+            encoder (tf.keras.models): Encoder model.
+            decoder (tf.keras.models): Decoder model.
+            latent_gain (dict(str, tf.keras.models)): Dictionary of the gain ANNs for prediction.
             latent_space (np.array): Latent space.
         """
         def below_10_percent(y_true, y_pred):
@@ -230,7 +232,69 @@ class DataLoaderFCI(DataLoader):
 
         latent_space = np.loadtxt(os.path.join(self.result_folder,"latent_z.txt"))
         
-        self.model = {"encoder": encoder, 
-             "decoder": decoder,
-             "latent_gain": latent_gain,
-             "latent_space": latent_space}
+        model = {
+            "encoder": encoder, 
+            "decoder": decoder,
+            "latent_space": latent_space,
+            "latent_gain": latent_gain # Gain network
+        }
+        
+        return(model)
+
+
+class DataLoaderMNIST(DataLoader):
+    def __init__(self, config, result_folder = None, take = 1000):
+        super().__init__(config, result_folder)
+        self.take = take
+        self.vae_norm = 255.
+        
+    
+    def _load_data(self) -> dict:
+        """Load dataset from mnist database.
+        """
+        (x_train, y_train), (_, _) = tf.keras.datasets.mnist.load_data()
+        
+        dataset = {
+            "data": x_train,
+            "labels": y_train 
+        }
+        
+        return(dataset)
+    
+    def _load_model(self):
+        """Load model.
+        returns:
+            encoder (tf.keras.Model): Encoder model.
+            decoder (tf.keras.Model): Decoder model.
+            latent_gain (dict(str, tf.keras.Model)): Dictionary of the gain ANNs for prediction.
+        """
+        encoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-encoder.keras"),
+                                        custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+
+        decoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder.keras"),
+                                        custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+        
+        latent_space = np.loadtxt(os.path.join(self.result_folder,"latent_z.txt"))
+        
+        model = {
+            "encoder": encoder, 
+            "decoder": decoder,
+            "latent_space": latent_space,
+        }
+
+        return(model)
+    
+    def get_x_y(self):
+        x = self.dataset['data']
+        y = self.dataset['labels']
+
+        return(x,y)
+    
+    def preprocessing(self):
+        self.dataset["data"] = np.expand_dims(self.dataset["data"], axis=-1) / self.vae_norm
+        
+    def get_shape(self):
+        return self.dataset["data"].shape[1:] 
+        
+        
+        
