@@ -42,8 +42,7 @@ class DataLoader:
     def preprocessing(self):
         """preprocessing of data. Normalization or other stuff.
         """
-        raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
-
+        pass
     
     def pipeline(self):
         """Apply preprocessing and transform dataset to tensorflow dataset. 

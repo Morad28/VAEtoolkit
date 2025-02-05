@@ -1,5 +1,5 @@
 import tkinter as tk
-from src.latent_postprocessing import PostprocessingVisualizer
+from src.latent_postprocessing import PostprocessingFCI
 import numpy as np
 import matplotlib.pyplot as plt 
 from src.dataloader import DataLoaderFCI
@@ -22,9 +22,8 @@ def main():
         result_folder=args.result_folder
     )
 
-
     root = tk.Tk()
-    vis = PostprocessingVisualizer(root, data)
+    vis = PostprocessingFCI(root, data)
     root.mainloop()
     
 if __name__ == '__main__':

@@ -15,8 +15,9 @@ from src.dataloader import DataLoader
 from src.config_vae import get_config
 import threading
 from tkinter import messagebox
+from abc import ABC, abstractmethod
 
-class PostprocessingBase:
+class PostprocessingBase(ABC):
     def __init__(self, root, data_loader):
         self.root = root
         self.data_loader = data_loader
@@ -24,16 +25,58 @@ class PostprocessingBase:
         self._initialize_model_components()
         self._setup_ui()
 
+
+    @abstractmethod
+    def get_label(self):
+        """Get the name of the label and value
+        
+        returns:
+        --------
+        label: str
+        value: numpy array
+        """
+        pass 
+    
+    @abstractmethod    
+    def plot_detail(self, coord):
+        """Routine to plot decoded.
+
+        Args:
+            coord (_type_): _description_
+        """
+        pass
+    
+    # @abstractmethod    
+    # def get_latent_space(self):
+    #     """Get the latent space
+        
+    #     returns:
+    #     --------
+    #     numpy array
+    #     """
+    #     pass    
+    
+    @abstractmethod
+    def add_custom_buttons(self, parent):
+        """Add custom buttons to the control frame."""
+        pass
+    
+    @abstractmethod
+    def add_settings(self,parent):
+        """Add custom settings to the control frame."""
+        pass    
+    
     def _initialize_config(self):
         """Load and initialize configuration."""
         self.config = get_config(self.data_loader.result_folder + '/conf.json')
         self.filtered = self.config.get("filter", {})  # Use .get() to avoid KeyError
-
+    
     def _initialize_model_components(self):
         """Initialize model-related components."""
         self.latent_space = self.data_loader.model["latent_space"]
         self.encoder = self.data_loader.model["encoder"]
         self.decoder = self.data_loader.model["decoder"]
+        self.filtered = self.config["filter"]
         self.vae_norm = self.data_loader.vae_norm
         self.dim = self.latent_space.shape[1]
         self._area = []
@@ -56,21 +99,22 @@ class PostprocessingBase:
         self._add_pca_settings(control_frame)
         self._add_grid_size_setting(control_frame)
         self._add_buttons(control_frame)
-
-    def _add_axis_selection(self, parent):
-        """Add X and Y axis selection widgets."""
-        tk.Label(parent, text="X-axis:").pack(side=tk.TOP)
-        self.x_axis_var = tk.IntVar(value=0)
-        self._add_spinbox(parent, self.x_axis_var, "update_axes")
-
-        tk.Label(parent, text="Y-axis:").pack(side=tk.TOP)
-        self.y_axis_var = tk.IntVar(value=1)
-        self._add_spinbox(parent, self.y_axis_var, "update_axes")
+        self.add_settings(control_frame)
 
     def _add_spinbox(self, parent, variable, command):
         """Helper function to add a spinbox."""
         spinbox = ttk.Spinbox(parent, from_=0, to=self.dim - 1, textvariable=variable, command=getattr(self, command), width=3)
         spinbox.pack(side=tk.TOP)
+        
+    def _add_axis_selection(self, parent):
+        """Add X and Y axis selection widgets."""
+        tk.Label(parent, text="X-axis:").pack(side=tk.TOP)
+        self.x_axis_var = tk.IntVar(value=0)
+        self._add_spinbox(parent, self.x_axis_var, "plot_main")
+
+        tk.Label(parent, text="Y-axis:").pack(side=tk.TOP)
+        self.y_axis_var = tk.IntVar(value=1)
+        self._add_spinbox(parent, self.y_axis_var, "plot_main")
 
     def _add_pca_settings(self, parent):
         """Add PCA-related settings."""
@@ -80,7 +124,7 @@ class PostprocessingBase:
 
         tk.Label(parent, text="Enable PCA:").pack(side=tk.TOP)
         self.enablePCA = tk.BooleanVar(value=False)
-        tk.Checkbutton(parent, text="Enable", variable=self.enablePCA, command=self.update_axes).pack(side=tk.TOP)
+        tk.Checkbutton(parent, text="Enable", variable=self.enablePCA, command=self.plot_main).pack(side=tk.TOP)
 
     def _add_grid_size_setting(self, parent):
         """Add grid size setting."""
@@ -90,9 +134,7 @@ class PostprocessingBase:
 
     def _add_buttons(self, parent):
         """Add action buttons."""
-        tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)
-        tk.Button(parent, text="Optimize", command=self.find_best).pack(pady=10)
-        tk.Button(parent, text="Slices", command=self.show_latent_space).pack(pady=5)
+        self.add_custom_buttons(parent)       
         tk.Button(self.root, text="Quit", command=self.quit_app).pack(pady=10)
 
     def _setup_plot_frame(self):
@@ -119,51 +161,36 @@ class PostprocessingBase:
         self.canvas_main.mpl_connect("motion_notify_event", self.on_motion)
         self.canvas_main.mpl_connect("button_release_event", self.on_release)
         self.drawing = False  # Track if the mouse is pressed
+        
+    def quit_app(self):
+        print("Application is closing...")  # For debugging/cleanup purposes
+        self.root.quit()
+        self.root.destroy() 
 
-    def get_label(self):
-        """Get the name of the label and value
-        
-        returns:
-        --------
-        label: str
-        value: numpy array
-        """
-        
-        raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
-    
-    def get_latent_space(self):
-        """Get the latent space
-        
-        returns:
-        --------
-        numpy array
-        """
-        raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
         
     def plot_main(self):
         self.ax_main.clear()
         
-        gg = self.get_label()
+        _, gg = self.get_label()
         
         self._pca = PCA(n_components=self._pca_dim.get())
 
         if self.enablePCA.get():
             latent_space = self._pca.fit_transform(self.latent_space)
             explained_var = self._pca.explained_variance_ratio_
-            sc = self.ax_main.scatter(latent_space[:, self.axis_x], latent_space[:, self.axis_y], c = gg)
-            self.ax_main.set_xlabel(f"Dimension {self.axis_x} ({explained_var[self.axis_x]:.2f})")
-            self.ax_main.set_ylabel(f"Dimension {self.axis_y} ({explained_var[self.axis_y]:.2f})")
+            sc = self.ax_main.scatter(latent_space[:, self.x_axis_var.get()], latent_space[:, self.y_axis_var.get()], c = gg)
+            self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()} ({explained_var[self.x_axis_var.get()]:.2f})")
+            self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()} ({explained_var[self.y_axis_var.get()]:.2f})")
 
         else:
-            sc = self.ax_main.scatter(self.latent_space[:, self.axis_x], self.latent_space[:, self.axis_y], c = gg)
-            self.ax_main.set_xlabel(f"Dimension {self.axis_x}")
-            self.ax_main.set_ylabel(f"Dimension {self.axis_y}")
+            sc = self.ax_main.scatter(self.latent_space[:, self.x_axis_var.get()], self.latent_space[:, self.y_axis_var.get()], c = gg)
+            self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()}")
+            self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()}")
             
         if hasattr(self, 'scatter_cb'):
             self.scatter_cb.update_normal(sc)
         else:
             self.scatter_cb = self.fig_main.colorbar(sc, ax=self.ax_main)
-
         self.canvas_main.draw()
 
     def on_click(self, event):
@@ -193,105 +220,57 @@ class PostprocessingBase:
             self.plot_detail(coord)
             
     
-    def plot_detail(self, coord):
-        # Create a detailed plot in the second figure based on clicked coordinates
-        self.ax_detail.clear()
-        
-        gain_entry = self.gain_entry.get()
-        
-        if self.enablePCA.get():
-            dim = self._pca_dim.get()
-        else:
-            dim = self.dim
-        
-        axis = []
-        
-        for i in list(set(range(dim)) - {self.axis_x, self.axis_y}):
-            axis.append(i)
-        
-        latent_point = np.zeros((1,dim))
-        latent_point[0,self.axis_x] = coord[0]
-        latent_point[0,self.axis_y] = coord[1]
-        if self.x_max is not None and len(axis)>0:
-            for a in axis:
-                latent_point[0,a] = self.x_max[a]
-        
-        if self.enablePCA.get():
-            latent_point = self._pca.inverse_transform(latent_point[0]).reshape(1,self.dim)
-        else:
-            dim = self.dim
-
-        laser = self.decoder.predict(latent_point,verbose=0)[0]
-        gain_val = self.rna_gain[gain_entry].predict(latent_point,verbose=0)
-        gain_val = self.gain_norm[gain_entry] * (gain_val)
     
-        self.ax_detail.plot(self.time, laser * self.vae_norm, label=f" {gain_entry}={gain_val}")
-        self.ax_detail.set_title("Profiles")
-        self.ax_detail.legend()
-        self.canvas_detail.draw()
-
-
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 class PostprocessingFCI(PostprocessingBase):
-    def __init__(self, root, data: DataLoader):
-        super().__init__(root, data)
- 
-    
-    def update_preprocessing(self):
-        for key in self.gain:
-            if self.entries[key].get() != '':
-                self.preprocessing_map[key] = eval('lambda x:' + self.entries[key].get(), {"np": np}) 
-        
-    def close_input_window(self):
-        self.prepro_window.destroy()
-        self.prepro_window = None
+    def __init__(self, root, data_loader: DataLoader):
+        super().__init__(root, data_loader)
 
-    def quit_app(self):
-        print("Application is closing...")  # For debugging/cleanup purposes
-        self.root.quit()
-        self.root.destroy() 
+    # def get_latent_space(self):
+    def _initialize_model_components(self):
+        
+        super()._initialize_model_components()
+        self.rna_gain = self.data_loader.model["latent_gain"]
+        self.gain =  self.data_loader.dataset['values']
+        
+        key = list(self.filtered.keys())[0]
+        gain_val = np.array(self.gain[key])
+        mask = gain_val >= self.filtered[key]
 
-    def update_axes(self, *args, **kwargs):
-        self.axis_x = self.x_axis_var.get()
-        self.axis_y = self.y_axis_var.get()
-        
-        dim = self._get_dim()
-        
-        if self.axis_x >= dim:
-            self.axis_x = dim - 1
-        if self.axis_y >= dim:
-            self.axis_y = dim - 1
-        if self.axis_x < 0:
-            self.axis_x = 0
-        if self.axis_y < 0:
-            self.axis_y = 0
-        
-        self.plot_main()
-
-    def plot_main(self, *args, **kwargs):
-        self.ax_main.clear()
-        
-        gg = self.gain[self.gain_entry.get()]
-        
-        self._pca = PCA(n_components=self._pca_dim.get())
-
-        if self.enablePCA.get():
-            latent_space = self._pca.fit_transform(self.latent_space)
-            explained_var = self._pca.explained_variance_ratio_
-            sc = self.ax_main.scatter(latent_space[:, self.axis_x], latent_space[:, self.axis_y], c = gg)
-            self.ax_main.set_xlabel(f"Dimension {self.axis_x} ({explained_var[self.axis_x]:.2f})")
-            self.ax_main.set_ylabel(f"Dimension {self.axis_y} ({explained_var[self.axis_y]:.2f})")
-
-        else:
-            sc = self.ax_main.scatter(self.latent_space[:, self.axis_x], self.latent_space[:, self.axis_y], c = gg)
-            self.ax_main.set_xlabel(f"Dimension {self.axis_x}")
-            self.ax_main.set_ylabel(f"Dimension {self.axis_y}")
+        for key in self.gain.keys():
+            self.gain[key] = np.array(self.gain[key])[mask]
             
-        if hasattr(self, 'scatter_cb'):
-            self.scatter_cb.update_normal(sc)
-        else:
-            self.scatter_cb = self.fig_main.colorbar(sc, ax=self.ax_main)
+        self.x_max = None
 
-        self.canvas_main.draw()
+        
+        
+        
+    def add_custom_buttons(self, parent):
+        tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)
+        tk.Button(parent, text="Optimize", command=self.find_best).pack(pady=10)
+        tk.Button(parent, text="Slices", command=self.show_latent_space).pack(pady=5)
+
+    def get_label(self):
+        return self.gain_entry.get(), self.gain[self.gain_entry.get()]
+
+    def add_settings(self, parent):
+        options = list(self.gain.keys())
+        tk.Label(parent, text="Select value").pack(side=tk.TOP)
+        self.gain_entry = tk.StringVar(value="gain") # Default to heatmap based on gain
+        self.gain_entry.trace_add("write", self.plot_main)
+        gain_entry_menu = tk.OptionMenu(parent, self.gain_entry, *options)
+        gain_entry_menu.pack(side=tk.TOP)
 
     def plot_detail(self, coord):
         # Create a detailed plot in the second figure based on clicked coordinates
@@ -306,12 +285,12 @@ class PostprocessingFCI(PostprocessingBase):
         
         axis = []
         
-        for i in list(set(range(dim)) - {self.axis_x, self.axis_y}):
+        for i in list(set(range(dim)) - {self.x_axis_var.get(), self.y_axis_var.get()}):
             axis.append(i)
         
         latent_point = np.zeros((1,dim))
-        latent_point[0,self.axis_x] = coord[0]
-        latent_point[0,self.axis_y] = coord[1]
+        latent_point[0,self.x_axis_var.get()] = coord[0]
+        latent_point[0,self.y_axis_var.get()] = coord[1]
         if self.x_max is not None and len(axis)>0:
             for a in axis:
                 latent_point[0,a] = self.x_max[a]
@@ -458,7 +437,7 @@ class PostprocessingFCI(PostprocessingBase):
         self.canvas_mapping.mpl_connect("button_release_event", self.on_release)
         
         n = self._N.get()
-        mesh, unfit = self._plot_mapping(self.axis_x,self.axis_y)            
+        mesh, unfit = self._plot_mapping(self.x_axis_var.get(),self.y_axis_var.get())            
         
         value_entry = self.gain_entry.get()
         dataset = tf.data.Dataset.from_tensor_slices(unfit).batch(256)

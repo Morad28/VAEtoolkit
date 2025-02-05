@@ -1,7 +1,7 @@
 import sys
 
 import tkinter as tk
-from src.latent_postprocessing import PostprocessingVisualizer
+from src.latent_postprocessing import PostprocessingFCI
 import numpy as np
 import matplotlib.pyplot as plt 
 from src.dataloader import DataLoaderFCI
