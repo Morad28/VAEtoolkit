@@ -14,7 +14,7 @@ class ModelSelector:
         self.vae = kwargs.get('vae', None)
         self.gain = kwargs.get('gain', None)
         
-    def get_model(self,input_shape=(512,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.):
+    def get_model(self,input_shape=(512,1), latent_dim=5,r_loss=1., k_loss=1., gain_loss=0.):
         s = {}
         if self.vae == '1D-FCI':
             s["vae"] = self._get_1d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)

@@ -12,6 +12,7 @@ class DataLoader:
     def __init__(self, config, result_folder=None):
         self.config = config
         self.dataset_path = config["dataset_path"]
+        print("dataset",self.dataset_path)
         self.result_folder = result_folder
         self.dataset = None
         self.model = None
@@ -140,8 +141,10 @@ class DataLoaderFCI(DataLoader):
     """
     
     def __init__(self, config, result_folder=None):
-        super().__init__(config, result_folder)
         self._preprocessed = False
+        self.gain_norm = {}
+        self.vae_norm = 1.
+        super().__init__(config, result_folder)
         
     def preprocessing(self):
         filter          = self.config.get("filter", None)
@@ -184,6 +187,7 @@ class DataLoaderFCI(DataLoader):
 
 
     def get_shape(self, dim = 1):
+        print(self.dataset['data'].shape)
         return (self.dataset['data'].shape[1], dim)
 
     def _load_data(self) -> dict:
@@ -193,8 +197,6 @@ class DataLoaderFCI(DataLoader):
         loaded_dataset = np.load(self.dataset_path, allow_pickle=True).item()
         self.vae_norm = np.max(loaded_dataset["data"])
         
-        
-        self.gain_norm = {}
         for key in loaded_dataset["values"]:
             self.gain_norm[key] = np.max(loaded_dataset["values"][key])
         

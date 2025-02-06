@@ -243,18 +243,19 @@ class PostprocessingFCI(PostprocessingBase):
         super()._initialize_model_components()
         self.rna_gain = self.data_loader.model["latent_gain"]
         self.gain =  self.data_loader.dataset['values']
+        self.time =  self.data_loader.dataset['time']
         
         key = list(self.filtered.keys())[0]
         gain_val = np.array(self.gain[key])
+        print(len(gain_val))
         mask = gain_val >= self.filtered[key]
 
         for key in self.gain.keys():
             self.gain[key] = np.array(self.gain[key])[mask]
             
         self.x_max = None
-
-        
-        
+        self.gain_norm = self.data_loader.gain_norm
+        self.vae_norm = self.data_loader.vae_norm     
         
     def add_custom_buttons(self, parent):
         tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)

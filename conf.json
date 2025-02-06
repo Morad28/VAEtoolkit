@@ -1,9 +1,9 @@
 {
     "dataset_path": "datasets/smooth_data_testing.npy",
     "results_dir": "testing/",
-    "name": "mnist_test",
-    "epoch_vae": 2,
-    "epoch_rna": 3,
+    "name": "dyn-shell",
+    "epoch_vae": 100,
+    "epoch_rna": 100,
     "latent_dim": 5,
     "batch_size_vae": 256,
     "batch_size_rna": 128,

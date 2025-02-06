@@ -117,11 +117,12 @@ class TrainerFCI(Trainer):
         
     def train(self):
         gain_only = self.config["reprise"]["gain_only"]
+        training = self.config['training']
         
         if not gain_only:
             self.train_vae()
-
-        self.train_gain('gain')
+        for key in training:
+            self.train_gain(key)
     
     def train_vae(self):
         config = self.config
@@ -130,12 +131,11 @@ class TrainerFCI(Trainer):
         
         dataset = self.data_loader.get_tf_dataset()
 
-        input_shape = self.data_loader.get_shape()[1]
-        print(self.data_loader.get_shape())
+        input_shape = self.data_loader.get_shape()
             
         # Get VAE model
         models = self.model.get_model(
-            input_shape = (input_shape,1), 
+            input_shape = input_shape, 
             latent_dim  = latent_dim,
             k_loss      = kl_loss
         )

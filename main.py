@@ -17,12 +17,12 @@ if __name__ == '__main__':
     config = get_config(config_path)
     
     # Load dataset and preprocessing
-    fci_dataset = DataLoaderMNIST(config)
+    fci_dataset = DataLoaderFCI(config)
         
     # Get VAE model
     model = ModelSelector()
-    # model.select(vae = "1D-FCI", gain = '12MLP')
-    model.select(vae = "2D-MNIST")
+    model.select(vae = "1D-FCI", gain = '12MLP')
+    # model.select(vae = "2D-MNIST")
     
-    trainer = TrainerMNIST(model, fci_dataset, config)
+    trainer = TrainerFCI(model, fci_dataset, config)
     trainer.train()
