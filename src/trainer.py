@@ -32,6 +32,7 @@ class Trainer:
         folder_name = f"std_{name}_{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}"
         self.res_folder = results_path / folder_name
         os.makedirs(os.path.dirname(self.res_folder / 'conf.json'), exist_ok=True)
+        self.config["dataset_path"] = os.path.abspath(self.config["dataset_path"])
         with open(self.res_folder / 'conf.json', "w") as file:
             json.dump(self.config, file, indent=4)
     

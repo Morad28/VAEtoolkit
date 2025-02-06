@@ -18,7 +18,7 @@ def main():
     args = parser.parse_args()
 
     data = DataLoaderFCI(
-        get_config("./conf.json"),
+        get_config(args.result_folder + "/conf.json"),
         result_folder=args.result_folder
     )
 
