@@ -51,7 +51,12 @@ train_vae_opti config.json
 Once the training is over you can use the visualisation tool with:
 
 ```bash
-visu path/to/dataset path/to/results/folder
+visu path/to/results/folder
+```
+or if you are developping a new visualisation tool:
+
+```bash
+python visu.py path/to/results/folder
 ```
 
 # Datasets

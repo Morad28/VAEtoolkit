@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="VAEOptim",                 # Your package name
+    name="vaetools",                 # Your package name
     version="0.1.0",                   # Initial version
     packages=find_packages(),          # Automatically find submodules
     description="This package is for VAE training and latent space visualization.",
     author="Morad BEN TAYEB",
-    author_email="morad.ben-tayeb@u-bordeaux1.fr",
+    author_email="morad.ben-tayeb@u-bordeaux.fr",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",      # Choose your license
@@ -14,11 +14,11 @@ setup(
     ],
     python_requires=">=3.6",           # Minimum Python version
     
-    py_modules=["train_vae_opti","visu"],  # `main.py` must be in the same directory as `setup.py`
+    py_modules=["main","visu"],  # `main.py` must be in the same directory as `setup.py`
 
     entry_points={
         "console_scripts": [
-            "train_vae_opti=train_vae_opti:main", 
+            "vaetools=main:main", 
             "visu=visu:main"
         ],
     },

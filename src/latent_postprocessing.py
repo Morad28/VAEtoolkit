@@ -69,7 +69,7 @@ class PostprocessingBase(ABC):
     def _initialize_config(self):
         """Load and initialize configuration."""
         self.config = get_config(self.data_loader.result_folder + '/conf.json')
-        self.filtered = self.config.get("filter", {})  # Use .get() to avoid KeyError
+        self.filtered = self.config.get("filter", {}) 
     
     def _initialize_model_components(self):
         """Initialize model-related components."""

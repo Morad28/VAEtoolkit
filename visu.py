@@ -13,7 +13,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 def main():    
     parser = argparse.ArgumentParser(description="Analyze VAE latent space.")
-    parser.add_argument("dataset_path", help="Path to the dataset.")
     parser.add_argument("result_folder", help="Directory containing VAE results.")
     args = parser.parse_args()
 
