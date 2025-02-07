@@ -226,13 +226,6 @@ class PostprocessingBase(ABC):
     
     
     
-    
-    
-    
-    
-    
-    
-    
 class PostprocessingFCI(PostprocessingBase):
     def __init__(self, root, data_loader: DataLoader):
         super().__init__(root, data_loader)
@@ -420,6 +413,8 @@ class PostprocessingFCI(PostprocessingBase):
 
     def plot_mapping(self):
         
+        value_entry = self.gain_entry.get()
+        
         self.mapping_window = tk.Toplevel(self.root)
         self.mapping_window.title("Mapping")
         
@@ -440,11 +435,8 @@ class PostprocessingFCI(PostprocessingBase):
         n = self._N.get()
         mesh, unfit = self._plot_mapping(self.x_axis_var.get(),self.y_axis_var.get())            
         
-        value_entry = self.gain_entry.get()
-        dataset = tf.data.Dataset.from_tensor_slices(unfit).batch(256)
-        self.decoding_dataset = dataset
-        value = self.rna_gain[value_entry].predict(dataset, verbose=0).reshape((n,n))
-        value = self.gain_norm[value_entry] * (value)
+        value = self._predict_gain(unfit)
+
         im = self.ax_mapping.pcolormesh(mesh[0],mesh[1], value, cmap='viridis')
         self.ax_mapping.set_aspect('equal')
         
@@ -529,7 +521,14 @@ class PostprocessingFCI(PostprocessingBase):
         # Update the slider variable
         self.slider_vars[index].set(float(value))
 
-  
+    def _predict_gain(self, dataset):
+        n = self._N.get()  # Get the resolution for the mapping
+        value_entry = self.gain_entry.get()
+        dataset_batched = tf.data.Dataset.from_tensor_slices(dataset).batch(256)
+        values = self.rna_gain[value_entry].predict(dataset_batched, verbose=0).reshape((n, n))
+        values = self.gain_norm[value_entry] * (values)
+        return (values)
+        
 
     def _update_latent_space_plots(self):
         """
@@ -558,25 +557,21 @@ class PostprocessingFCI(PostprocessingBase):
                             latent_points[:, k] = fixed_values[k]
 
                     # Predict the gain values
-                    value_entry = self.gain_entry.get()
-                    dataset = tf.data.Dataset.from_tensor_slices(latent_points).batch(256)
-                    values = self.rna_gain[value_entry].predict(dataset, verbose=0).reshape((n, n))
-                    values = self.gain_norm[value_entry] * (values)
+                    values = self._predict_gain(latent_points)
 
                     # Plot the values
                     im = self.ax_mapping_all[j, i].pcolormesh(mesh[0], mesh[1], values, cmap='viridis')
                     self.ax_mapping_all[j, i].set_xlabel(f'Dim {i}')
                     self.ax_mapping_all[j, i].set_ylabel(f'Dim {j}')
                     # Update or create the colorbar
-                    if hasattr(self, 'cbar'):
-                        self.ax_mapping_all_cbar.update_normal(im)  # Update the existing colorbar
-                    else:
-                        self.ax_mapping_all_cbar = plt.colorbar(im, ax=self.ax_mapping_all[j, i])  # Create a new colorbar
-
-
                 else:
                     # Hide the plots for i >= j
                     self.ax_mapping_all[j, i].axis("off")
+                    
+        if hasattr(self, 'ax_mapping_all_cbar'):
+            self.ax_mapping_all_cbar.update_normal(im)  # Update the existing colorbar
+        else:
+            self.ax_mapping_all_cbar = plt.colorbar(im, ax=self.ax_mapping_all.ravel().tolist())  # Create a new colorbar
 
         # Redraw the canvas
         self.canvas_mapping_all.draw()
