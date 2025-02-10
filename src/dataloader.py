@@ -57,20 +57,13 @@ class DataLoader:
         
         train_dataset, test_dataset = self.to_dataset(batch_size, shuffle=shuffle, split=split)
         
-        if split > 0:
-            self.tf_dataset = {
-                "train_x"   : train_dataset.map(lambda x,y:x),
-                "val_x"     : test_dataset.map(lambda x,y:x),
-                "train_y"   : train_dataset.map(lambda x,y:y),
-                "val_y"     : test_dataset.map(lambda x,y:y)
-            }
-        elif split == 0:
-            self.tf_dataset = {
-                "train_x"   : train_dataset.map(lambda x,y:x),
-                "val_x"     : None,
-                "train_y"   : train_dataset.map(lambda x,y:y),
-                "val_y"     : None
-            }
+        self.tf_dataset = {
+            "train_x"   : train_dataset.map(lambda x,y:x),
+            "val_x"     : test_dataset.map(lambda x,y:x),
+            "train_y"   : train_dataset.map(lambda x,y:y) if 0 < split < 1 else None,
+            "val_y"     : test_dataset.map(lambda x,y:y) if 0 < split < 1 else None
+        }
+
             
     def get_data(self):
         """Get data.
@@ -244,7 +237,7 @@ class DataLoaderFCI(DataLoader):
 
 
 class DataLoaderMNIST(DataLoader):
-    def __init__(self, config, result_folder = None, take = 1000):
+    def __init__(self, config, result_folder = None, take = 5000):
         self.take = take
         self.vae_norm = 255.
         super().__init__(config, result_folder)
