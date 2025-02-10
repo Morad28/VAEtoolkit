@@ -42,22 +42,11 @@ class PostprocessingBase(ABC):
         """
         pass
     
-    # @abstractmethod    
-    # def get_latent_space(self):
-    #     """Get the latent space
-        
-    #     returns:
-    #     --------
-    #     numpy array
-    #     """
-    #     pass    
     
-    @abstractmethod
     def add_custom_buttons(self, parent):
         """Add custom buttons to the control frame."""
         pass
     
-    @abstractmethod
     def add_settings(self,parent):
         """Add custom settings to the control frame."""
         pass    
@@ -72,7 +61,6 @@ class PostprocessingBase(ABC):
         self.latent_space = self.data_loader.model["latent_space"]
         self.encoder = self.data_loader.model["encoder"]
         self.decoder = self.data_loader.model["decoder"]
-        self.filtered = self.config["filter"]
         self.vae_norm = self.data_loader.vae_norm
         self.dim = self.latent_space.shape[1]
         self._area = []
@@ -162,15 +150,15 @@ class PostprocessingBase(ABC):
         print("Application is closing...")  # For debugging/cleanup purposes
         self.root.quit()
         self.root.destroy() 
-
         
+
     def plot_main(self):
         self.ax_main.clear()
         
         _, gg = self.get_label()
         
         self._pca = PCA(n_components=self._pca_dim.get())
-
+        
         if self.enablePCA.get():
             latent_space = self._pca.fit_transform(self.latent_space)
             explained_var = self._pca.explained_variance_ratio_
@@ -190,7 +178,6 @@ class PostprocessingBase(ABC):
         self.canvas_main.draw()
 
     def on_click(self, event):
-        
         if len(self._area) == 2:
             self._area.pop(0)
         self._area.append([event.xdata, event.ydata])
@@ -215,10 +202,53 @@ class PostprocessingBase(ABC):
             coord = [event.xdata, event.ydata]
             self.plot_detail(coord)
             
+    def _get_dim(self):
+        if self.enablePCA.get():
+            dim = self._pca_dim.get()
+        else:
+            dim = self.dim
+        return dim
+            
     
+ 
+class PostprocessingMNSIT(PostprocessingBase):
+    def __init__(self, root, data_loader: DataLoader):
+        super().__init__(root, data_loader)
     
+    def _initialize_model_components(self):
+        super()._initialize_model_components()
+        
+    def get_label(self):
+        return "MNIST Labels", self.data_loader.dataset["labels"]
     
+    def plot_detail(self, coord):
+        """Plot the detail plot."""
+        # Create a detailed plot in the second figure based on clicked coordinates
+        self.ax_detail.clear()
+        
+            
+        dim = self._get_dim()
+        
+        axis = []
+        
+        for i in list(set(range(dim)) - {self.x_axis_var.get(), self.y_axis_var.get()}):
+            axis.append(i)
+        
+        latent_point = np.zeros((1,dim))
+        latent_point[0,self.x_axis_var.get()] = coord[0]
+        latent_point[0,self.y_axis_var.get()] = coord[1]
+        
+        if self.enablePCA.get():
+            latent_point = self._pca.inverse_transform(latent_point[0]).reshape(1,self.dim)
+
+
+        laser = self.decoder.predict(latent_point,verbose=0)[0]
     
+        self.ax_detail.imshow(laser)
+        self.ax_detail.set_title("Profiles")
+        self.ax_detail.legend()
+        self.canvas_detail.draw()
+       
     
     
     
@@ -233,10 +263,10 @@ class PostprocessingFCI(PostprocessingBase):
         self.rna_gain = self.data_loader.model["latent_gain"]
         self.gain =  self.data_loader.dataset['values']
         self.time =  self.data_loader.dataset['time']
-        
+        self.filtered = self.config["filter"]
+
         key = list(self.filtered.keys())[0]
         gain_val = np.array(self.gain[key])
-        print(len(gain_val))
         mask = gain_val >= self.filtered[key]
 
         for key in self.gain.keys():
@@ -399,13 +429,7 @@ class PostprocessingFCI(PostprocessingBase):
                     unfit[:,a] = self.x_max[a]
         
         return mesh,unfit
-    
-    def _get_dim(self):
-        if self.enablePCA.get():
-            dim = self._pca_dim.get()
-        else:
-            dim = self.dim
-        return dim
+
 
     def plot_mapping(self):
         

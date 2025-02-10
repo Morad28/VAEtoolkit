@@ -245,9 +245,9 @@ class DataLoaderFCI(DataLoader):
 
 class DataLoaderMNIST(DataLoader):
     def __init__(self, config, result_folder = None, take = 1000):
-        super().__init__(config, result_folder)
         self.take = take
         self.vae_norm = 255.
+        super().__init__(config, result_folder)
         
     
     def _load_data(self) -> dict:
@@ -256,14 +256,15 @@ class DataLoaderMNIST(DataLoader):
         (x_train, y_train), (_, _) = tf.keras.datasets.mnist.load_data()
         
         dataset = {
-            "data": x_train,
-            "labels": y_train 
+            "data": x_train[:self.take],
+            "labels": y_train[:self.take] 
         }
         
         return(dataset)
     
     def _load_model(self):
         """Load model.
+        
         returns:
             encoder (tf.keras.Model): Encoder model.
             decoder (tf.keras.Model): Decoder model.
