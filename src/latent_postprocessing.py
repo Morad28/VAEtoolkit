@@ -1,12 +1,8 @@
 import matplotlib.pyplot as plt  
 import numpy as np
 import os
-import sys
 from tqdm import tqdm
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-from multiprocessing import Pool
-import matplotlib.cm as cm
 import tensorflow as tf
 import tkinter as tk
 from tkinter import ttk
@@ -576,28 +572,3 @@ class PostprocessingFCI(PostprocessingBase):
         # Redraw the canvas
         self.canvas_mapping_all.draw()
     
-    def on_click(self, event):
-        
-        if len(self._area) == 2:
-            self._area.pop(0)
-        self._area.append([event.xdata, event.ydata])
-        
-        if event.inaxes == self.ax_main or event.inaxes == self.ax_mapping:
-            coord =  [event.xdata, event.ydata] 
-            self.plot_detail(coord)
-            
-    def on_press(self, event):
-        self.drawing = True
-        self.update_area(event)
-
-    def on_motion(self, event):
-        if self.drawing:
-            self.update_area(event)
-
-    def on_release(self, event):
-        self.drawing = False
-
-    def update_area(self, event):
-        if event.inaxes == self.ax_main or event.inaxes == self.ax_mapping:
-            coord = [event.xdata, event.ydata]
-            self.plot_detail(coord)
