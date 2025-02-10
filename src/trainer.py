@@ -3,11 +3,12 @@ from src.model import ModelSelector
 import numpy as np
 import tensorflow as tf
 from pathlib import Path
-import copy
 import os
 import json
+from abc import ABC, abstractmethod
 
-class Trainer:
+
+class Trainer(ABC):
     def __init__(self,model : ModelSelector, data_loader : DataLoader, config):
         self.model = model
         self.data_loader = data_loader
@@ -16,6 +17,11 @@ class Trainer:
         self.res_folder = None 
         self._prepare_data()
 
+    @abstractmethod
+    def train(self):
+        """Train routine.
+        """
+        pass
         
     def _prepare_data(self):
         self.data_loader.pipeline()
@@ -106,9 +112,6 @@ class Trainer:
 
         return history
 
-    
-    def train(self):
-        pass
     
     
 class TrainerFCI(Trainer):
