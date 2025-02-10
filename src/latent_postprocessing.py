@@ -362,7 +362,7 @@ class PostprocessingFCI(PostprocessingBase):
             pca_random_samples = (random_samples)
             random_samples = self._pca.inverse_transform(pca_random_samples)
         
-        predictions = np.exp(self.rna_gain[self.gain_entry.get()].predict(random_samples, verbose=0))
+        predictions = self.rna_gain[self.gain_entry.get()].predict(random_samples, verbose=0) * self.gain_norm[self.gain_entry.get()]
         
         # Find the maximum
         max_index = np.argmax(predictions)
