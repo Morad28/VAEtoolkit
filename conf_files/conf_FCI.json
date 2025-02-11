@@ -1,4 +1,5 @@
 {
+    "DataType" : "FCI"
     "dataset_path": "datasets/smooth_data_testing.npy",
     "results_dir": "testing/",
     "name": "dyn-shell",

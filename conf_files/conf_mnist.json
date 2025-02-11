@@ -1,0 +1,11 @@
+{
+    "dataset_path": "",
+    "results_dir": "testing_mnist/",
+    "name": "mnist_test",
+    "epoch_vae": 1000,
+    "epoch_rna": 1000,
+    "latent_dim": 5,
+    "batch_size_vae": 256,
+    "kl_loss": 1e-5
+
+}
