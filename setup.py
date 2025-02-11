@@ -18,8 +18,7 @@ setup(
 
     entry_points={
         "console_scripts": [
-            "vaetools=main:main", 
-            "visu=visu:main"
+            "vaetools=vaetools:main", 
         ],
     },
     

@@ -237,7 +237,7 @@ class DataLoaderFCI(DataLoader):
 
 
 class DataLoaderMNIST(DataLoader):
-    def __init__(self, config, result_folder = None, take = 5000):
+    def __init__(self, config, result_folder = None, take = -1):
         self.take = take
         self.vae_norm = 255.
         super().__init__(config, result_folder)
@@ -246,11 +246,20 @@ class DataLoaderMNIST(DataLoader):
     def _load_data(self) -> dict:
         """Load dataset from mnist database.
         """
+        filter = self.config.get("filter", None)
         (x_train, y_train), (_, _) = tf.keras.datasets.mnist.load_data()
         
+        x_train = x_train[:self.take]
+        y_train = y_train[:self.take]
+        
+        if filter is not None:
+            mask = np.isin(y_train, filter)
+            x_train = x_train[mask]
+            y_train = y_train[mask]
+        
         dataset = {
-            "data": x_train[:self.take],
-            "labels": y_train[:self.take] 
+            "data": x_train,
+            "labels": y_train
         }
         
         return(dataset)
