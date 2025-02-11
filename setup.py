@@ -14,7 +14,7 @@ setup(
     ],
     python_requires=">=3.6",           # Minimum Python version
     
-    py_modules=["main","visu"],  # `main.py` must be in the same directory as `setup.py`
+    py_modules=["vaetools"],  # `main.py` must be in the same directory as `setup.py`
 
     entry_points={
         "console_scripts": [

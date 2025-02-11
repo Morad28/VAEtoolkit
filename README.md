@@ -21,10 +21,11 @@ You can find an example of dataset under datasets/ folder that you can copy.
 
 ```json
 {
+    "DataType" : "1DFCI",
     "dataset_path": "datasets/smooth_data_testing.npy",
     "results_dir": "testing/",
-    "name": "dyn_shell",
-    "epoch_vae": 2,
+    "name": "dyn-shell",
+    "epoch_vae": 5,
     "epoch_rna": 3,
     "latent_dim": 5,
     "batch_size_vae": 256,
@@ -33,7 +34,7 @@ You can find an example of dataset under datasets/ folder that you can copy.
     "training" : ["gain", "yield"],
     "reprise" : {
         "gain_only" : 0,
-        "result_folder" : "./testing/std_dyn_shell_9435_latent_5_kl_1e-05_256/"
+        "result_folder" : "./testing/std_dyn_shell_330_latent_5_kl_1e-05_256/"
     },
     "filter" : {
         "gain" : 2e-6
@@ -45,23 +46,29 @@ The **training** option is here to specify what quantities you want to train. In
 Then you can start the training with 
 
 ```bash
-train_vae_opti config.json
+vaetools train conf_files/conf_FCI.json
+```
+
+or
+
+```bash
+python vaetools.py train conf_files/conf_FCI.json
 ```
 
 Once the training is over you can use the visualisation tool with:
 
 ```bash
-visu path/to/results/folder
+vaetools visu path/to/results/folder
 ```
-or if you are developping a new visualisation tool:
+or if you are developping:
 
 ```bash
-python visu.py path/to/results/folder
+python vaetools.py visu path/to/results/folder
 ```
 
 # Datasets
 
-You can create a new dataset using the script provided as guide in **utils/convert_to_npy.py**. In this version of the script it will scan all folders from CHIC results and get the .dat (laser pulse) and .txt files (thermonuclear gain, yields and more can be added).
+For FCI application, you can create a new dataset using the script provided as guide in **utils/convert_to_npy.py**. In this version of the script it will scan all folders from CHIC results and get the .dat (laser pulse) and .txt files (thermonuclear gain, yields and more can be added).
 
 It will create the .npy dataset using this dictionnary structure:
 ```python
