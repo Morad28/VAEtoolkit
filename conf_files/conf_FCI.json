@@ -1,10 +1,10 @@
 {
-    "DataType" : "FCI"
+    "DataType" : "1DFCI",
     "dataset_path": "datasets/smooth_data_testing.npy",
     "results_dir": "testing/",
     "name": "dyn-shell",
-    "epoch_vae": 100,
-    "epoch_rna": 100,
+    "epoch_vae": 5,
+    "epoch_rna": 3,
     "latent_dim": 5,
     "batch_size_vae": 256,
     "batch_size_rna": 128,
@@ -14,7 +14,5 @@
         "gain_only" : 0,
         "result_folder" : "./testing/std_dyn_shell_330_latent_5_kl_1e-05_256/"
     },
-    "filter" : {
-        "gain" : 2e-6
-    }
+    "filter" : [5,6]
 }

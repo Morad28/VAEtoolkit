@@ -1,11 +1,12 @@
 {
+    "DataType" : "MNIST",
     "dataset_path": "",
     "results_dir": "testing_mnist/",
     "name": "mnist_test",
-    "epoch_vae": 1000,
-    "epoch_rna": 1000,
+    "epoch_vae": 10,
+    "epoch_rna": 10,
     "latent_dim": 5,
     "batch_size_vae": 256,
-    "kl_loss": 1e-5
-
+    "kl_loss": 1e-5,
+    "filter" : [5,6]
 }
