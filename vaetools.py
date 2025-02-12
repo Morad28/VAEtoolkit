@@ -1,16 +1,14 @@
-import sys
+import argparse
 import os 
+from src.config_vae import get_config
 from src.model import ModelSelector
 from src.dataloader import (DataLoaderFCI, 
                             DataLoaderMNIST)
-from src.config_vae import get_config
-import argparse
 from src.trainer import (TrainerFCI, 
                          TrainerMNIST)
 
 from src.latent_postprocessing import (PostprocessingFCI, 
                                        PostprocessingMNSIT)
-import tkinter as tk
 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -54,9 +52,9 @@ def loader(config):
 def main():
     """Training part of VAE model.
     """
-    parser = argparse.ArgumentParser(description="Training part.")
-    parser.add_argument("mode", type=str, default="train", choices=["train", "visu"], help="Choices are: train or visua.")
-    parser.add_argument("path", help="Path to configuration file.", default=None)
+    parser = argparse.ArgumentParser(description="This is a small python module to train a VAE model and to visualize the results.")
+    parser.add_argument("mode", type=str, default="train", choices=["train", "visu"], help="Choices are: train or visu.")
+    parser.add_argument("path", help="Path to configuration file or result folder to visualize.", default=None)
     args = parser.parse_args()    
     
     
