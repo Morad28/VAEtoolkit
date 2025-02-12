@@ -53,12 +53,15 @@ def main():
     """Training part of VAE model.
     """
     parser = argparse.ArgumentParser(description="This is a small python module to train a VAE model and to visualize the results.")
-    parser.add_argument("mode", type=str, default="train", choices=["train", "visu"], help="Choices are: train or visu.")
     parser.add_argument("path", help="Path to configuration file or result folder to visualize.", default=None)
-    args = parser.parse_args()    
+    args = parser.parse_args() 
     
+    if os.path.isfile(args.path) and args.path.endswith(".json"):
+        mode = 'train'
+    elif os.path.isdir(args.path):
+        mode = 'visu'    
     
-    if args.mode == 'train':
+    if mode == 'train':
         config = get_config(args.path)
         data_type = config.get('DataType', '1DFCI')
         loader_class, trainer_class, postpro_class = loader(config)
@@ -75,7 +78,7 @@ def main():
         trainer = trainer_class(model, fci_dataset, config)
         trainer.train()
     
-    if args.mode == 'visu':
+    if mode == 'visu':
         config = get_config(args.path + "/conf.json")
         loader_class, trainer_class, postpro_class = loader(config)
 
