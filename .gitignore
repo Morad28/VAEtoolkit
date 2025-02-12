@@ -1,5 +1,6 @@
 src_dynshell/
 decoding/
+testing*
 datasets/
 results/
 out/
