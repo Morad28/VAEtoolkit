@@ -1,5 +1,6 @@
 import argparse
 import os 
+import tkinter as tk
 from src.config_vae import get_config
 from src.model import ModelSelector
 from src.dataloader import (DataLoaderFCI, 
