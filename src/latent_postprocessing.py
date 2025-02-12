@@ -352,8 +352,10 @@ class PostprocessingFCI(PostprocessingBase):
             dim = self._pca_dim.get()
         else:
             dim = self.dim
+            
+        xmin,xmax,ymin,ymax = self._get_min_max()
         
-        bounds = [(-3, 3)] * dim 
+        bounds = [(min(xmin,ymin), max(xmax,ymax))] * dim 
         random_samples = np.array([np.random.uniform(low, high, size=50000) for low, high in bounds]).T
         print('Random samples:', random_samples.shape)
         print('Random samples:', random_samples[0])
@@ -377,8 +379,6 @@ class PostprocessingFCI(PostprocessingBase):
         print("Max value:", max_value)
         
         self.update_slider_values(best_x)
-
-
         messagebox.showinfo("Optimization done", f"f(x_max) = {max_value}")
         
         self.x_max = best_x
@@ -387,6 +387,10 @@ class PostprocessingFCI(PostprocessingBase):
         threading.Thread(target=self._optimize).start()
         
     def _get_min_max(self):
+        
+        if len(self._area) < 2:
+            return (-3, 3, -3, 3)
+        
         xmin = min(np.array(self._area)[:,0])
         xmax = max(np.array(self._area)[:,0])
         ymin = min(np.array(self._area)[:,1])
@@ -398,8 +402,12 @@ class PostprocessingFCI(PostprocessingBase):
         
         xmin,xmax,ymin,ymax = self._get_min_max()
                 
-        n = self._N.get()
+        if hasattr(self, "slider_vars"):
+            translation_point = [self.slider_vars[i].get() for i in range(len(self.slider_vars))]
+        else:
+            translation_point = [0] * self._get_dim()
         
+        n = self._N.get()
         x = np.linspace(xmin,xmax,n)
         y = np.linspace(ymin,ymax,n)
         mesh = np.meshgrid(x,y)
@@ -414,9 +422,8 @@ class PostprocessingFCI(PostprocessingBase):
             unfit = np.zeros((grid.shape[0],self._pca_dim.get() ))                
             unfit[:,x_axis] = grid[:,0]
             unfit[:,y_axis] = grid[:,1]
-            if self.x_max is not None:
-                for a in axis:
-                    unfit[:,a] = self.x_max[a]
+            for a in axis:
+                unfit[:,a] = translation_point[a]
             unfit = self._pca.inverse_transform(unfit)
         else:
             for i in list(set(range(self.dim)) - {x_axis, y_axis}):
@@ -424,9 +431,8 @@ class PostprocessingFCI(PostprocessingBase):
             unfit = np.zeros((grid.shape[0],self.dim ))
             unfit[:,x_axis] = grid[:,0]
             unfit[:,y_axis] = grid[:,1]
-            if self.x_max is not None:
-                for a in axis:
-                    unfit[:,a] = self.x_max[a]
+            for a in axis:
+                unfit[:,a] = translation_point[a]
         
         return mesh,unfit
 
@@ -496,6 +502,9 @@ class PostprocessingFCI(PostprocessingBase):
         self.slider_vars = []  # Store slider variables
         self.sliders = []  # Store slider widgets
         xmin, xmax, ymin, ymax = self._get_min_max()
+        from_value = np.round(min(xmin, ymin),1)
+        to_value = np.round(max(xmax, ymax),1)
+        print(from_value, to_value)
         for i in range(dim):
             label = tk.Label(slider_frame, text=f"Dim {i}:")
             label.pack(pady=5)
@@ -504,8 +513,8 @@ class PostprocessingFCI(PostprocessingBase):
             slider_var = tk.DoubleVar(value=0.0)  # Default value for the slider
             slider = tk.Scale(
                 slider_frame,
-                from_=min(xmin, ymin),  # Minimum value for the latent space dimension
-                to=max(xmax, ymax),      # Maximum value for the latent space dimension
+                from_=from_value,  # Minimum value for the latent space dimension
+                to=to_value,      # Maximum value for the latent space dimension
                 resolution=0.1,  # Step size for the slider
                 orient=tk.HORIZONTAL,
                 variable=slider_var,
@@ -558,8 +567,8 @@ class PostprocessingFCI(PostprocessingBase):
         n = self._N.get()  # Get the resolution for the mapping
 
         # Get the current slider values
-        fixed_values = [var.get() for var in self.slider_vars]
-
+        fixed_values = [float(str(var.get())) for var in self.slider_vars]
+        
         # Clear the existing plots
         for i in range(dim):
             for j in range(dim):
