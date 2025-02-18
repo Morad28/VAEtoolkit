@@ -12,7 +12,6 @@ class DataLoader:
     def __init__(self, config, result_folder=None):
         self.config = config
         self.dataset_path = config["dataset_path"]
-        print("dataset",self.dataset_path)
         self.result_folder = result_folder
         self.dataset = None
         self.model = None

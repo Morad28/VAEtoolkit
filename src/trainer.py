@@ -5,6 +5,7 @@ import tensorflow as tf
 from pathlib import Path
 import os
 import json
+import matplotlib.pyplot as plt 
 from abc import ABC, abstractmethod
 
 
@@ -145,13 +146,34 @@ class TrainerFCI(Trainer):
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
-        _, encoder, _ = models["vae"]
+        _, encoder, decoder = models["vae"]
     
         # Saving latent space
         batch_size = 256
         dataset_batched, _ = self.data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
         _, _, z = encoder.predict(dataset_batched)
+        tilde_laser = decoder.predict(z)
+        print(dataset_batched,type(dataset_batched))
         np.savetxt(self.res_folder / 'latent_z.txt',z)
+
+
+        data_train = history.history['loss']
+        data_val = history.history['val_loss']
+
+        np.savetxt(self.res_folder / "losses.txt",[data_train,data_val])
+        
+        plt.figure()
+        plt.grid(True,which="both")
+        plt.semilogy(data_train,label="Données d'entraînement")
+        plt.semilogy(data_val,label="Données de validation")
+        plt.ylabel("Loss")
+        plt.xlabel("Epochs")
+        plt.tick_params(axis='both', which='both', direction='in')
+        plt.legend(frameon=True)
+        plt.savefig(self.res_folder / "losses.png")
+        plt.close()
+
+
         return history
 
         
@@ -214,7 +236,6 @@ class TrainerMNIST(Trainer):
         dataset = self.data_loader.get_tf_dataset()
 
         input_shape = self.data_loader.get_shape()
-        print(self.data_loader.get_shape())
             
         # Get VAE model
         models = self.model.get_model(
