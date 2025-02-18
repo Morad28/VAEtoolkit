@@ -15,40 +15,33 @@ from src.latent_postprocessing import (PostprocessingFCI,
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
-DATA_LOADER_MAP = {
-    '1DFCI': DataLoaderFCI,
-    'MNIST': DataLoaderMNIST,
+_DATA_TYPE = {
+    "1DFCI": {
+        "loader": DataLoaderFCI,
+        "trainer": TrainerFCI,
+        "postprocessing": PostprocessingFCI,
+    },
+    "MNIST": {
+        "loader": DataLoaderMNIST,
+        "trainer": TrainerMNIST,
+        "postprocessing": PostprocessingMNSIT,
+    }
 }
 
-TRAINER_MAP = {
-    '1DFCI': TrainerFCI,
-    'MNIST': TrainerMNIST,
-}
-
-POSTPRO_MAP = {
-    '1DFCI': PostprocessingFCI, 
-    'MNIST': PostprocessingMNSIT
-}
 
 def loader(config):
-    """Get correct class according to configuration file.
+    """Get correct classes according to configuration file.
 
     Args:
         config (dict): Config file.
 
     Returns:
-        _type_: Classes.
+        tuple: (DataLoader class, Trainer class, Postprocessing class)
     """
-
-    # Retrieve the class name for the data loader
-    loader_class_name = config.get('DataType', '1DFCI')  # Default to 'DataLoader' if not present
+    data_type = config.get("DataType", "1DFCI")  # Default to "1DFCI" if missing
+    classes = _DATA_TYPE.get(data_type, _DATA_TYPE["1DFCI"])  # Default if not found
     
-    # Get the class from the dictionary, default to DataLoader if not found
-    loader_class = DATA_LOADER_MAP.get(loader_class_name, None)
-    trainer_class = TRAINER_MAP.get(loader_class_name, None)
-    postpro_class = POSTPRO_MAP.get(loader_class_name, None)
-    
-    return loader_class, trainer_class, postpro_class
+    return classes["loader"], classes["trainer"], classes["postprocessing"]
     
 def main():
     """Training part of VAE model.
@@ -61,7 +54,7 @@ def main():
         mode = 'train'
     elif os.path.isdir(args.path):
         mode = 'visu'    
-    
+
     if mode == 'train':
         config = get_config(args.path)
         data_type = config.get('DataType', '1DFCI')
