@@ -81,6 +81,22 @@ class Trainer(ABC):
         decoder.save(self.res_folder / 'decoder_model.keras')
         
         models["vae"] = (autoencoder, encoder, decoder)
+        
+        data_train = history.history['loss']
+        data_val = history.history['val_loss']
+
+        np.savetxt(self.res_folder / "losses.txt",[data_train,data_val])
+        
+        plt.figure()
+        plt.grid(True,which="both")
+        plt.semilogy(data_train,label="Données d'entraînement")
+        plt.semilogy(data_val,label="Données de validation")
+        plt.ylabel("Loss")
+        plt.xlabel("Epochs")
+        plt.tick_params(axis='both', which='both', direction='in')
+        plt.legend(frameon=True)
+        plt.savefig(self.res_folder / "losses.png")
+        plt.close()
                 
         return history
     
@@ -153,26 +169,28 @@ class TrainerFCI(Trainer):
         dataset_batched, _ = self.data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
         _, _, z = encoder.predict(dataset_batched)
         tilde_laser = decoder.predict(z)
-        print(dataset_batched,type(dataset_batched))
+        data, label = self.data_loader.get_x_y()
+
         np.savetxt(self.res_folder / 'latent_z.txt',z)
 
 
-        data_train = history.history['loss']
-        data_val = history.history['val_loss']
 
-        np.savetxt(self.res_folder / "losses.txt",[data_train,data_val])
-        
-        plt.figure()
-        plt.grid(True,which="both")
-        plt.semilogy(data_train,label="Données d'entraînement")
-        plt.semilogy(data_val,label="Données de validation")
-        plt.ylabel("Loss")
-        plt.xlabel("Epochs")
-        plt.tick_params(axis='both', which='both', direction='in')
-        plt.legend(frameon=True)
-        plt.savefig(self.res_folder / "losses.png")
+        error = []
+        for i in range(len(data)):
+            error.append( np.max(np.abs(data[i] - tilde_laser[i])) / np.max(np.abs(data[i])) )
+
+        plt.figure()            
+        plt.hist(np.array(error) * 100 ,bins=30)
+        plt.title("Erreur de reconstruction")
+        plt.savefig(self.res_folder / "hist_error.png")
         plt.close()
-
+        
+        plt.figure()            
+        plt.hist(label ,bins=30)
+        plt.title("Distribution des gains")
+        plt.yscale("log")
+        plt.savefig(self.res_folder / "hist_gain.png")
+        plt.close()
 
         return history
 
