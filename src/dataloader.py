@@ -179,8 +179,8 @@ class DataLoaderFCI(DataLoader):
 
 
     def get_shape(self, dim = 1):
-        print(self.dataset['data'].shape)
-        return (self.dataset['data'].shape[1], dim)
+        print("getshape",self.dataset['data'].shape)
+        return self.dataset['data'].shape[1:]
 
     def _load_data(self) -> dict:
         """Load dataset from .npy file.

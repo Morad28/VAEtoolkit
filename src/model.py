@@ -10,7 +10,7 @@ class ModelSelector:
     def __init__(self):
         self.model_name = None
     
-    def select(self, **kwargs):
+    def select(self, kwargs):
         self.vae = kwargs.get('vae', None)
         self.gain = kwargs.get('gain', None)
         
@@ -19,7 +19,7 @@ class ModelSelector:
         if self.vae == '1D-FCI':
             s["vae"] = self._get_1d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
         if self.vae == '2D-FCI':
-            s["vae"] = self._get_2d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
+            s["vae"] = self._get_2d_vae_fci(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
         if self.vae == '2D-MNIST':
             s["vae"] = self._get_2d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
         if self.gain == '12MLP':
@@ -28,7 +28,7 @@ class ModelSelector:
             raise ValueError('Model name not recognized')
         return s
     
-    def _get_2d_vae(self, input_shape=(512,2), latent_dim=5, r_loss=0., k_loss=1., gain_loss=0.):
+    def _get_2d_vae_fci(self, input_shape=(512,2), latent_dim=5, r_loss=0., k_loss=1., gain_loss=0.):
         """For training on 1D FCI target 
 
         Args:
