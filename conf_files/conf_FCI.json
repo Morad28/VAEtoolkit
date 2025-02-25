@@ -1,5 +1,9 @@
 {
     "DataType" : "1DFCI",
+    "Model" : {
+        "vae" : "1D-FCI",
+        "gain": "12MLP"
+    },
     "dataset_path": "datasets/smooth_data_testing.npy",
     "results_dir": "testing/",
     "name": "dyn-shell",

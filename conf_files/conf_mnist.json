@@ -1,5 +1,8 @@
 {
     "DataType" : "MNIST",
+    "Model" : {
+        "vae" : "2D-MNIST"
+    },
     "dataset_path": "",
     "results_dir": "testing_mnist/",
     "name": "mnist_test",

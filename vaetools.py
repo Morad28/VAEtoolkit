@@ -58,16 +58,14 @@ def main():
     if mode == 'train':
         config = get_config(args.path)
         data_type = config.get('DataType', '1DFCI')
+        model_select = config.get('Model', {"vae" : "1D-FCI", "gain": "12MLP"})
         loader_class, trainer_class, postpro_class = loader(config)
         # Load dataset and preprocessing
         fci_dataset = loader_class(config)
             
         # Get VAE model
         model = ModelSelector()
-        if data_type == "1DFCI":
-            model.select(vae='1D-FCI', gain = '12MLP')
-        elif data_type == "MNIST":
-            model.select(vae = "2D-MNIST")
+        model.select(model_select)
         
         trainer = trainer_class(model, fci_dataset, config)
         trainer.train()
