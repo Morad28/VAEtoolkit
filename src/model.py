@@ -18,6 +18,8 @@ class ModelSelector:
         s = {}
         if self.vae == '1D-FCI':
             s["vae"] = self._get_1d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
+        if self.vae == '2D-FCI':
+            s["vae"] = self._get_2d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
         if self.vae == '2D-MNIST':
             s["vae"] = self._get_2d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
         if self.gain == '12MLP':
@@ -25,6 +27,60 @@ class ModelSelector:
         if not bool(s):
             raise ValueError('Model name not recognized')
         return s
+    
+    def _get_2d_vae(self, input_shape=(512,2), latent_dim=5, r_loss=0., k_loss=1., gain_loss=0.):
+        """For training on 1D FCI target 
+
+        Args:
+            input_shape (tuple, optional): Input shape of the data. Defaults to (512,2).
+            latent_dim (int, optional): Dimensionality of the latent space. Defaults to 5.
+            r_loss (float, optional): Reconstruction loss weight. Defaults to 0..
+            k_loss (float, optional): KL divergence loss weight. Defaults to 1..
+            gain_loss (float, optional): Additional loss weight. Defaults to 0..
+
+        Returns:
+            Model: autoencoder
+        """
+        inputs = Input(shape=input_shape)
+        x = Conv1D(32, 3, activation='leaky_relu', padding='same', strides=2)(inputs)
+        x = MaxPooling1D(pool_size=2)(x)
+        x = Conv1D(64, 3, activation='leaky_relu', padding='same', strides=2)(x)
+        x = MaxPooling1D(pool_size=2)(x)
+        x = Conv1D(64, 3, activation='leaky_relu', padding='same', strides=2)(x)
+        x = MaxPooling1D(pool_size=2)(x)
+        x = Conv1D(128, 3, activation='leaky_relu', padding='same', strides=2)(x)
+        x = MaxPooling1D(pool_size=2)(x)
+        x = Conv1D(128, 3, activation='leaky_relu', padding='same', strides=2)(x)
+        x = Flatten()(x)
+
+        z_mean = layers.Dense(latent_dim, name="z_mean")(x)
+        z_log_var = layers.Dense(latent_dim, name="z_log_var")(x)
+        z = Sampling()([z_mean, z_log_var])
+        encoder = keras.Model(inputs, [z_mean, z_log_var, z], name="encoder")
+        encoder.compile()
+
+        # Decoder
+        inputs = Input(shape=(latent_dim,))
+        x = Dense(32 * 128, activation='leaky_relu')(inputs)
+        x = Reshape((32, 128))(x)
+        x = Conv1DTranspose(128, 3, activation='leaky_relu', padding='same', strides=2)(x)
+        x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=2)(x)
+        x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=2)(x)
+        x = Conv1DTranspose(32, 3, activation='leaky_relu', padding='same', strides=2)(x)
+        
+        # Change output channels from 1 to 2 to match input shape
+        decoded = Conv1DTranspose(2, 1, padding='same')(x)
+        decoded = Reshape((512, 2))(decoded)
+        
+        decoder = tf.keras.Model(inputs, decoded, name='decoder')
+        decoder.compile()
+
+        print(encoder.summary())
+        print(decoder.summary())
+
+        autoencoder = VAE(encoder, decoder, [r_loss, k_loss, gain_loss])
+
+        return autoencoder, encoder, decoder
         
     
     def _get_1d_vae(self, input_shape=(512,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.):
