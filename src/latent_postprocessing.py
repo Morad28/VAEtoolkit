@@ -247,8 +247,8 @@ class PostprocessingMNIST(PostprocessingBase):
         self.ax_detail.set_title("Profiles")
         self.ax_detail.legend()
         self.canvas_detail.draw()
-       
- 
+        
+
 class PostprocessingFCI(PostprocessingBase):
     def __init__(self, root, data_loader: DataLoader):
         super().__init__(root, data_loader)
@@ -631,7 +631,8 @@ class PostprocessingFCI(PostprocessingBase):
                 
     def plot_mapping_from_slices(self, x_dim, y_dim):
         """
-        Ouvre la fenÃªtre Mapping et affiche le mapping des dimensions sÃ©lectionnÃ©es.
+        Ouvre la fenÃªtre Mapping et affiche le mapping des dimensions sÃ©lectionnÃ©es
+        en s'assurant que le mapping est reconstruit complÃ¨tement sur ce slice.
         """
         value_entry = self.gain_entry.get()
 
@@ -655,11 +656,36 @@ class PostprocessingFCI(PostprocessingBase):
         self.canvas_mapping.mpl_connect("motion_notify_event", self.on_motion)
         self.canvas_mapping.mpl_connect("button_release_event", self.on_release)
 
-        # GÃ©nÃ©rer et afficher le mapping
-        mesh, unfit = self._plot_mapping(x_dim, y_dim)
+        # DÃ©finir les bornes correctes pour la reconstruction complÃ¨te du slice
+        xmin, xmax = np.min(self.latent_space[:, x_dim]), np.max(self.latent_space[:, x_dim])
+        ymin, ymax = np.min(self.latent_space[:, y_dim]), np.max(self.latent_space[:, y_dim])
+        
+        # Reconstruire le mapping complet sur ce slice
+        n = self._N.get()
+        x = np.linspace(xmin, xmax, n)
+        y = np.linspace(ymin, ymax, n)
+        mesh = np.meshgrid(x, y)
+        grid = np.vstack([m.flatten() for m in mesh]).T
+        
+        # Adapter la reconstruction des valeurs en fonction des dimensions fixes
+        dim = self._get_dim()
+        unfit = np.zeros((grid.shape[0], dim))
+        unfit[:, x_dim] = grid[:, 0]
+        unfit[:, y_dim] = grid[:, 1]
+        
+        fixed_values = [self.slider_vars[i].get() for i in range(dim)]
+        for i in range(dim):
+            if i != x_dim and i != y_dim:
+                unfit[:, i] = fixed_values[i]
+        
+        # PrÃ©dire les valeurs pour le mapping
         value = self._predict_gain(unfit)
         im = self.ax_mapping.pcolormesh(mesh[0], mesh[1], value, cmap='viridis')
         self.ax_mapping.set_aspect('equal')
+
+        # Ajuster les limites des axes
+        self.ax_mapping.set_xlim([xmin, xmax])
+        self.ax_mapping.set_ylim([ymin, ymax])
 
         # Ajouter une colorbar
         if hasattr(self, 'mapping_cb'):
