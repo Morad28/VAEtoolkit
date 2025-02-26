@@ -46,24 +46,24 @@ The **training** option is here to specify what quantities you want to train. In
 Then you can start the training with 
 
 ```bash
-vaetools train conf_files/conf_FCI.json
+vaetools conf_files/conf_FCI.json
 ```
 
 or
 
 ```bash
-python vaetools.py train conf_files/conf_FCI.json
+python vaetools.py conf_files/conf_FCI.json
 ```
 
 Once the training is over you can use the visualisation tool with:
 
 ```bash
-vaetools visu path/to/results/folder
+vaetools path/to/results/folder
 ```
 or if you are developping:
 
 ```bash
-python vaetools.py visu path/to/results/folder
+python vaetools.py path/to/results/folder
 ```
 
 # Datasets
