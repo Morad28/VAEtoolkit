@@ -178,8 +178,9 @@ class DataLoaderFCI(DataLoader):
         self.dataset['name'] = np.array(self.dataset['name'])[mask]
 
 
-    def get_shape(self, dim = 1):
-        print("getshape",self.dataset['data'].shape)
+    def get_shape(self):
+        if len(self.dataset['data'].shape[1:]) == 1:
+            return (self.dataset['data'].shape[1], 1)
         return self.dataset['data'].shape[1:]
 
     def _load_data(self) -> dict:
