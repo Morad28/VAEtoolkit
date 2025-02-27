@@ -9,7 +9,7 @@ from src.trainer import (TrainerFCI,
                          TrainerMNIST)
 
 from src.latent_postprocessing import (PostprocessingFCI, 
-                                       PostprocessingMNIST)
+                                       PostProcessingMNIST)
 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -24,7 +24,7 @@ _DATA_TYPE = {
     "MNIST": {
         "loader": DataLoaderMNIST,
         "trainer": TrainerMNIST,
-        "postprocessing": PostprocessingMNIST,
+        "postprocessing": PostProcessingMNIST,
     }
 }
 
