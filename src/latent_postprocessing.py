@@ -209,7 +209,9 @@ class PostprocessingBase(ABC):
             dim = self.dim
         return dim
             
-class PostprocessingMNIST(PostprocessingBase):
+    
+ 
+class PostProcessingMNIST(PostprocessingBase):
     def __init__(self, root, data_loader: DataLoader):
         super().__init__(root, data_loader)
     
@@ -247,6 +249,9 @@ class PostprocessingMNIST(PostprocessingBase):
         self.ax_detail.legend()
         self.canvas_detail.draw()
        
+    
+    
+    
 class PostprocessingFCI(PostprocessingBase):
     def __init__(self, root, data_loader: DataLoader):
         super().__init__(root, data_loader)
@@ -573,7 +578,7 @@ class PostprocessingFCI(PostprocessingBase):
         for j in range(dim):
             for i in range(dim):
                 if i < j:
-                    mesh, latent_points = self._plot_mapping(i, j)
+                    mesh, latent_points = self._plot_mapping(i,j)
 
                     # Set the fixed values for the other dimensions
                     for k in range(dim):
@@ -585,21 +590,12 @@ class PostprocessingFCI(PostprocessingBase):
 
                     # Plot the values
                     im = self.ax_mapping_all[j, i].pcolormesh(mesh[0], mesh[1], values, cmap='viridis')
-
-                    # Ajouter les labels uniquement pour la premiÃ¨re colonne et la premiÃ¨re ligne
-                    if i == 0:
-                        self.ax_mapping_all[j, i].set_ylabel(f'Dim {j}')
-                    if j == dim - 1:
-                        self.ax_mapping_all[j, i].set_xlabel(f'Dim {i}')
-
-                    # Supprimer les ticks des axes pour Ã©viter l'affichage des valeurs
-                    self.ax_mapping_all[j, i].set_xticks([])
-                    self.ax_mapping_all[j, i].set_yticks([])
-
+                    self.ax_mapping_all[j, i].set_xlabel(f'Dim {i}')
+                    self.ax_mapping_all[j, i].set_ylabel(f'Dim {j}')
+                    # Update or create the colorbar
                 else:
                     # Hide the plots for i >= j
                     self.ax_mapping_all[j, i].axis("off")
-
                     
         if hasattr(self, 'ax_mapping_all_cbar'):
             self.ax_mapping_all_cbar.update_normal(im)  # Update the existing colorbar
@@ -608,61 +604,4 @@ class PostprocessingFCI(PostprocessingBase):
 
         # Redraw the canvas
         self.canvas_mapping_all.draw()
-
-        # Ajouter un gestionnaire de clic pour ouvrir le slice dans la fenÃªtre Mapping
-        self.canvas_mapping_all.mpl_connect("button_press_event", self._on_latent_space_click)
-  
-    def _on_latent_space_click(self, event):
-        """
-        Ouvre la fenÃªtre Mapping en utilisant les dimensions sÃ©lectionnÃ©es dans la fenÃªtre des slices.
-        """
-        if event.inaxes is None:
-            return  # Ignore si le clic est en dehors des axes
-
-        # Trouver les indices (i, j) correspondant Ã  l'axe cliquÃ©
-        for j in range(self._get_dim()):
-            for i in range(self._get_dim()):
-                if i < j and self.ax_mapping_all[j, i] == event.inaxes:
-                    # DÃ©tecte le sous-graphique cliquÃ© et ouvre le mapping correspondant
-                    self.plot_mapping_from_slices(i, j)
-                    return
-                
-    def plot_mapping_from_slices(self, x_dim, y_dim):
-        """
-        Ouvre la fenÃªtre Mapping et affiche le mapping des dimensions sÃ©lectionnÃ©es.
-        """
-        value_entry = self.gain_entry.get()
-
-        # CrÃ©er la fenÃªtre de mapping
-        self.mapping_window = tk.Toplevel(self.root)
-        self.mapping_window.title(f"Mapping (Dim {x_dim} vs Dim {y_dim})")
-
-        # Ajouter un bouton pour sauvegarder le mapping
-        button = tk.Frame(self.mapping_window)
-        button.pack(pady=10)
-        tk.Button(button, text="Save", command=self.save_mapping).grid(row=0, column=0)
-
-        # CrÃ©er la figure et le canevas
-        self.fig_mapping, self.ax_mapping = plt.subplots()
-        self.canvas_mapping = FigureCanvasTkAgg(self.fig_mapping, master=self.mapping_window)
-        self.canvas_mapping.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-
-        # Connexion des Ã©vÃ©nements pour la sÃ©lection interactive
-        self.canvas_mapping.mpl_connect("button_press_event", self.on_click)
-        self.canvas_mapping.mpl_connect("button_press_event", self.on_press)
-        self.canvas_mapping.mpl_connect("motion_notify_event", self.on_motion)
-        self.canvas_mapping.mpl_connect("button_release_event", self.on_release)
-
-        # GÃ©nÃ©rer et afficher le mapping
-        mesh, unfit = self._plot_mapping(x_dim, y_dim)
-        value = self._predict_gain(unfit)
-        im = self.ax_mapping.pcolormesh(mesh[0], mesh[1], value, cmap='viridis')
-        self.ax_mapping.set_aspect('equal')
-
-        # Ajouter une colorbar
-        if hasattr(self, 'mapping_cb'):
-            self.mapping_cb.remove()
-        self.mapping_cb = self.fig_mapping.colorbar(im, ax=self.ax_mapping)
-
-        self.ax_mapping.set_title(value_entry)
-        self.canvas_mapping.draw()
+    
