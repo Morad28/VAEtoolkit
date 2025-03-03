@@ -605,3 +605,46 @@ class PostprocessingFCI(PostprocessingBase):
         # Redraw the canvas
         self.canvas_mapping_all.draw()
     
+class PostprocessingFCI2D(PostprocessingFCI):
+    def __init__(self, root, data_loader: DataLoader):
+        super().__init__(root, data_loader)
+        
+        
+    def plot_detail(self, coord):
+        # Create a detailed plot in the second figure based on clicked coordinates
+        self.ax_detail.clear()
+        
+        gain_entry = self.gain_entry.get()
+        
+        if self.enablePCA.get():
+            dim = self._pca_dim.get()
+        else:
+            dim = self.dim
+        
+        axis = []
+        
+        for i in list(set(range(dim)) - {self.x_axis_var.get(), self.y_axis_var.get()}):
+            axis.append(i)
+        
+        latent_point = np.zeros((1,dim))
+        latent_point[0,self.x_axis_var.get()] = coord[0]
+        latent_point[0,self.y_axis_var.get()] = coord[1]
+        if self.x_max is not None and len(axis)>0:
+            for a in axis:
+                latent_point[0,a] = self.x_max[a]
+        
+        if self.enablePCA.get():
+            latent_point = self._pca.inverse_transform(latent_point[0]).reshape(1,self.dim)
+        else:
+            dim = self.dim
+
+        laser = self.decoder.predict(latent_point,verbose=0)[0]
+        gain_val = self.rna_gain[gain_entry].predict(latent_point,verbose=0)
+        gain_val = self.gain_norm[gain_entry] * (gain_val)
+    
+        print(self.vae_norm, self.vae_norm.shape)
+        laser = laser * self.vae_norm
+        self.ax_detail.plot(self.time, laser[:,0], label=f" {gain_entry}={gain_val}")
+        self.ax_detail.set_title("Profiles")
+        self.ax_detail.legend()
+        self.canvas_detail.draw()

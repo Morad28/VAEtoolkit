@@ -1,5 +1,5 @@
 {
-    "DataType" : "1DFCI",
+    "DataType" : "2DFCI",
     "Model" : {
         "vae" : "2D-FCI",
         "gain": "12MLP"

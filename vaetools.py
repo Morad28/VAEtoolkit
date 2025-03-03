@@ -9,7 +9,8 @@ from src.trainer import (TrainerFCI,
                          TrainerMNIST)
 
 from src.latent_postprocessing import (PostprocessingFCI, 
-                                       PostProcessingMNIST)
+                                       PostProcessingMNIST,
+                                       PostprocessingFCI2D)
 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -25,7 +26,12 @@ _DATA_TYPE = {
         "loader": DataLoaderMNIST,
         "trainer": TrainerMNIST,
         "postprocessing": PostProcessingMNIST,
-    }
+    },
+    "2DFCI": {
+        "loader": DataLoaderFCI,
+        "trainer": TrainerFCI,
+        "postprocessing": PostprocessingFCI2D,
+    },
 }
 
 
@@ -60,6 +66,7 @@ def main():
         data_type = config.get('DataType', '1DFCI')
         model_select = config.get('Model', {"vae" : "1D-FCI", "gain": "12MLP"})
         loader_class, trainer_class, postpro_class = loader(config)
+        
         # Load dataset and preprocessing
         fci_dataset = loader_class(config)
             
@@ -82,6 +89,9 @@ def main():
         root = tk.Tk()
         vis = postpro_class(root, data)
         root.mainloop()    
+        
+    else:
+        print("Invalid file or foler.")
     
 
 if __name__ == '__main__':

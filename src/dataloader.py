@@ -162,8 +162,8 @@ class DataLoaderFCI(DataLoader):
         self.dataset['data'] = np.array(self.dataset['data'])
         self.dataset['values']['gain'] = np.array(self.dataset['values']['gain'])
         
-        self.dataset['data'] = self.dataset['data'] / np.max(self.dataset['data'], axis=-1, keepdims=True)
-        print(self.dataset['data'].shape)
+        self.dataset['data'] = self.dataset['data'] / self.vae_norm
+        
         for key in self.dataset['values'].keys():
             self.dataset['values'][key] = np.array(self.dataset['values'][key]) / (np.max(self.dataset['values'][key]))
         
@@ -189,7 +189,14 @@ class DataLoaderFCI(DataLoader):
         """
 
         loaded_dataset = np.load(self.dataset_path, allow_pickle=True).item()
-        self.vae_norm = np.max(loaded_dataset["data"])
+        
+        loaded_dataset['data'] = np.array(loaded_dataset['data'])
+        loaded_dataset['values']['gain'] = np.array(loaded_dataset['values']['gain'])
+        
+        if len(loaded_dataset["data"].shape) == 2:
+            self.vae_norm  =  np.max(loaded_dataset["data"])
+        elif len(loaded_dataset["data"].shape) == 3:
+            self.vae_norm  =  np.max(loaded_dataset["data"], axis=(0, 1), keepdims=True)
         
         for key in loaded_dataset["values"]:
             self.gain_norm[key] = np.max(loaded_dataset["values"][key])
