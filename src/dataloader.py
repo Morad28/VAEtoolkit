@@ -162,7 +162,8 @@ class DataLoaderFCI(DataLoader):
         self.dataset['data'] = np.array(self.dataset['data'])
         self.dataset['values']['gain'] = np.array(self.dataset['values']['gain'])
         
-        self.dataset['data'] = self.dataset['data'] / np.max(self.dataset['data'])
+        self.dataset['data'] = self.dataset['data'] / np.max(self.dataset['data'], axis=-1, keepdims=True)
+        print(self.dataset['data'].shape)
         for key in self.dataset['values'].keys():
             self.dataset['values'][key] = np.array(self.dataset['values'][key]) / (np.max(self.dataset['values'][key]))
         
