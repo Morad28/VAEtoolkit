@@ -8,8 +8,8 @@ path = sys.argv[1]
 npy_path = sys.argv[2]
 
 # List all .dat files in the folder
-dat_files = list(glob.glob(f"{path}/*/*.dat"))
-txt_files = list(glob.glob(f"{path}/*/*.txt"))
+dat_files = list(glob.glob(f"{path}/*/shot_*.dat"))
+txt_files = list(glob.glob(f"{path}/*/gain.txt"))
 base_files = list(glob.glob(f"{path}/*")) 
 
 print(base_files[0])
@@ -21,6 +21,8 @@ dataset = []
 datas = []
 gains = []
 yields = []
+adiabat = []
+energy = []
 time_step = []
 names = []
 
@@ -43,14 +45,18 @@ for b, file, txt in tqdm(list(zip(base_files, dat_files, txt_files))):
     # Initialize variables to store gain and yield
     gain = None
     yield_value = None
-
+    adiabat_value = None
+    energy_value = None
     # Iterate through each line to find the gain and yield values
     for line in lines:
         if "Thermonuclear gain" in line:
             gain = float(line.split(':')[1].strip())
         elif "Yield" in line:
             yield_value = float(line.split(':')[1].strip())   
-
+        elif "adiabat" in line:
+            adiabat_value = float(line.split(':')[1].strip())   
+        elif "Incident energy laser (kJ)" in line:
+            energy_value = float(line.split(':')[1].strip())   
     # Load the data from the file
     # print(file)
     data = np.loadtxt(file)  # Adjust depending on how the data is structured
@@ -58,12 +64,21 @@ for b, file, txt in tqdm(list(zip(base_files, dat_files, txt_files))):
     
     datas.append(data_f)
     gains.append(gain)
+    adiabat.append(adiabat_value)
     yields.append(yield_value)
+    energy.append(energy_value)
     names.append(os.path.basename(b))
 
-
-    # Store the gain and data in a dictionary
-dataset = {'values': {"gain": gains, "yield": yields}, 'data': datas, 'time': time, 'name': names}
+print(adiabat_value)
+# Store the gain and data in a dictionary
+dataset = {'values': {"gain": np.array(gains), 
+                      "yield": np.array(yields), 
+                      "adiabat": np.array(adiabat), 
+                      "energy" : np.array(energy)}, 
+           'data': np.array(datas), 
+           'time': np.array(time), 
+           'name': names
+        }
 
 if os.path.exists(npy_path):
   print("WARNING : The File %s already exists" % npy_path)  
