@@ -256,7 +256,6 @@ class PostprocessingFCI(PostprocessingBase):
     def __init__(self, root, data_loader: DataLoader):
         super().__init__(root, data_loader)
 
-    # def get_latent_space(self):
     def _initialize_model_components(self):
         
         super()._initialize_model_components()
@@ -328,6 +327,7 @@ class PostprocessingFCI(PostprocessingBase):
         self.ax_detail.set_title("Profiles")
         self.ax_detail.legend()
         self.canvas_detail.draw()
+        
         
     def save_mapping(self):
         laser_decoded = self.decoder.predict(self.decoding_dataset,verbose=0)
@@ -608,11 +608,25 @@ class PostprocessingFCI(PostprocessingBase):
 class PostprocessingFCI2D(PostprocessingFCI):
     def __init__(self, root, data_loader: DataLoader):
         super().__init__(root, data_loader)
-        
+      
+    def _initialize_model_components(self):
+    
+        super()._initialize_model_components()  
+               
         
     def plot_detail(self, coord):
         # Create a detailed plot in the second figure based on clicked coordinates
         self.ax_detail.clear()
+        
+        if hasattr(self, "_ax2_detail"):
+            self._ax2_detail.clear()
+        else:
+            self._ax2_detail = self.ax_detail.twinx()
+        
+        if hasattr(self, "_ax2_detail_top"):
+            self._ax2_detail_top.clear()
+        else:
+            self._ax2_detail_top = self.ax_detail.twiny()
         
         gain_entry = self.gain_entry.get()
         
@@ -641,10 +655,26 @@ class PostprocessingFCI2D(PostprocessingFCI):
         laser = self.decoder.predict(latent_point,verbose=0)[0]
         gain_val = self.rna_gain[gain_entry].predict(latent_point,verbose=0)
         gain_val = self.gain_norm[gain_entry] * (gain_val)
-    
-        print(self.vae_norm, self.vae_norm.shape)
-        laser = laser * self.vae_norm
-        self.ax_detail.plot(self.time, laser[:,0], label=f" {gain_entry}={gain_val}")
-        self.ax_detail.set_title("Profiles")
-        self.ax_detail.legend()
+
+        laser = laser * np.squeeze(self.vae_norm)
+        
+        # Assuming self.time is your data for the x-axis and self.laser is your dataset
+        # Plot first dataset on primary y-axis
+        self.ax_detail.plot(self.time[:, 1], laser[:, 0], label=f"{gain_entry}={gain_val}", color='g')
+        self.ax_detail.set_xlabel('Time (s)')  # First x-axis
+        self.ax_detail.set_ylabel('Laser Intensity (Green)', color='g')
+        self.ax_detail.tick_params(axis='y', labelcolor='g')
+
+        # Create second y-axis for the second dataset
+        self._ax2_detail = self.ax_detail.twinx()
+        self._ax2_detail.plot(self.time[:, 1], laser[:, 1], color='r', label='Laser 2')
+        self._ax2_detail.set_ylabel('Laser Intensity (Red)', color='r')
+        self._ax2_detail.tick_params(axis='y', labelcolor='r')
+
+        # Create second x-axis with a different scale
+        self._ax2_detail_top = self.ax_detail.twiny()  # Create a second x-axis
+        self._ax2_detail_top.plot(self.time[:, 1], laser[:, 1], color='b', label='Laser 2 (Top)')
+        self._ax2_detail_top.set_xlabel('Scaled Time (s)', color='b')  # Set label for second x-axis
+        self._ax2_detail_top.tick_params(axis='x', labelcolor='b')
+        # Redraw the canvas
         self.canvas_detail.draw()
