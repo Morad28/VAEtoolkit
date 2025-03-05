@@ -608,10 +608,6 @@ class PostprocessingFCI(PostprocessingBase):
 class PostprocessingFCI2D(PostprocessingFCI):
     def __init__(self, root, data_loader: DataLoader):
         super().__init__(root, data_loader)
-      
-    def _initialize_model_components(self):
-    
-        super()._initialize_model_components()  
                
         
     def plot_detail(self, coord):
@@ -621,13 +617,11 @@ class PostprocessingFCI2D(PostprocessingFCI):
         if hasattr(self, "_ax2_detail"):
             self._ax2_detail.clear()
         else:
-            self._ax2_detail = self.ax_detail.twinx()
-        
-        if hasattr(self, "_ax2_detail_top"):
-            self._ax2_detail_top.clear()
-        else:
-            self._ax2_detail_top = self.ax_detail.twiny()
-        
+            ax = self.ax_detail.twinx()
+            ax.set_ylabel('Target', color='r')
+            ax.tick_params(axis='y', labelcolor='r')
+            self._ax2_detail = ax.twiny()
+               
         gain_entry = self.gain_entry.get()
         
         if self.enablePCA.get():
@@ -658,23 +652,21 @@ class PostprocessingFCI2D(PostprocessingFCI):
 
         laser = laser * np.squeeze(self.vae_norm)
         
-        # Assuming self.time is your data for the x-axis and self.laser is your dataset
-        # Plot first dataset on primary y-axis
-        self.ax_detail.plot(self.time[:, 1], laser[:, 0], label=f"{gain_entry}={gain_val}", color='g')
-        self.ax_detail.set_xlabel('Time (s)')  # First x-axis
-        self.ax_detail.set_ylabel('Laser Intensity (Green)', color='g')
-        self.ax_detail.tick_params(axis='y', labelcolor='g')
+        # Plot first dataset (Laser 1) on primary y-axis (green)
+        self.ax_detail.plot(self.time[:, 0], laser[:, 0], label=f"{gain_entry}={np.squeeze(gain_val)}", color='g')
+        self.ax_detail.set_xlabel('Time (s)', color='g')  # Set primary x-axis label   
+        self.ax_detail.set_ylabel('Shot laser', color='g')  # Set primary y-axis label
+        self.ax_detail.tick_params(axis='y', labelcolor='g')  # Set color of ticks
 
-        # Create second y-axis for the second dataset
-        self._ax2_detail = self.ax_detail.twinx()
-        self._ax2_detail.plot(self.time[:, 1], laser[:, 1], color='r', label='Laser 2')
-        self._ax2_detail.set_ylabel('Laser Intensity (Red)', color='r')
-        self._ax2_detail.tick_params(axis='y', labelcolor='r')
+        # Create second y-axis for the second dataset (Laser 2)
+        self._ax2_detail.plot(self.time[:, 1], laser[:, 1], label='Target', color='r')
+        self._ax2_detail.set_xlabel('x (mm)', color='r')  # Set secondary y-axis label
+        self._ax2_detail.xaxis.set_label_position('top')  
+        self._ax2_detail.tick_params(axis='x', labelcolor='r')  # Set color of ticks for secondary y-axis
 
-        # Create second x-axis with a different scale
-        self._ax2_detail_top = self.ax_detail.twiny()  # Create a second x-axis
-        self._ax2_detail_top.plot(self.time[:, 1], laser[:, 1], color='b', label='Laser 2 (Top)')
-        self._ax2_detail_top.set_xlabel('Scaled Time (s)', color='b')  # Set label for second x-axis
-        self._ax2_detail_top.tick_params(axis='x', labelcolor='b')
+        # Optional: Add legends for clarity
+        self.ax_detail.legend(loc='upper left')
+        # self._ax2_detail.legend(loc='upper right')
+
         # Redraw the canvas
         self.canvas_detail.draw()
