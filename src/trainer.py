@@ -127,6 +127,22 @@ class Trainer(ABC):
 
         models["mlp"] = latent_gain
 
+        data_train = history.history['loss']
+        data_val = history.history['val_loss']
+
+        np.savetxt(res_folder_n / "losses.txt",[data_train,data_val])
+        
+        plt.figure()
+        plt.grid(True,which="both")
+        plt.semilogy(data_train,label="Données d'entraînement")
+        plt.semilogy(data_val,label="Données de validation")
+        plt.ylabel("Loss")
+        plt.xlabel("Epochs")
+        plt.tick_params(axis='both', which='both', direction='in')
+        plt.legend(frameon=True)
+        plt.savefig(res_folder_n/ "losses.png")
+        plt.close()
+
         return history
 
     
