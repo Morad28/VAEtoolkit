@@ -10,12 +10,14 @@ from abc import ABC, abstractmethod
 
 
 class Trainer(ABC):
-    def __init__(self,model : ModelSelector, data_loader : DataLoader, config):
-        self.model = model
+    def __init__(self,model_selector : ModelSelector, data_loader : DataLoader, config):
+        self.model_selector = model_selector
         self.data_loader = data_loader
         self.config = config
         self.results_path = None
         self.res_folder = None 
+        self.models = {}
+        self.history = {}
         self._prepare_data()
 
     @abstractmethod
@@ -67,7 +69,7 @@ class Trainer(ABC):
             tensorboard_callback
         ]
         
-        # Train VAE model
+        # Train VAE model_selector
         history = autoencoder.fit(
                 x,
                 epochs=epoch_vae, 
@@ -75,12 +77,14 @@ class Trainer(ABC):
                 callbacks=callbacks,
                 verbose = 2
         )
+        
+        self.history["vae"] = history
 
-        autoencoder.save(self.res_folder / "model.keras")
+        autoencoder.save(self.res_folder / "model_selector.keras")
         encoder.save(self.res_folder / 'encoder_model.keras')
         decoder.save(self.res_folder / 'decoder_model.keras')
         
-        models["vae"] = (autoencoder, encoder, decoder)
+        self.models["vae"] = (autoencoder, encoder, decoder)
         
         data_train = history.history['loss']
         data_val = history.history['val_loss']
@@ -122,10 +126,12 @@ class Trainer(ABC):
             validation_data=y,
             callbacks=callbacks,
             verbose = 2)
+        
+        self.history["mlp"] = history
 
-        latent_gain.save(res_folder_n / "model.keras")
+        latent_gain.save(res_folder_n / "model_selector.keras")
 
-        models["mlp"] = latent_gain
+        self.models["mlp"] = latent_gain
 
         data_train = history.history['loss']
         data_val = history.history['val_loss']
@@ -148,8 +154,8 @@ class Trainer(ABC):
     
     
 class TrainerFCI(Trainer):
-    def __init__(self,model : ModelSelector, data_loader : DataLoader, config):
-        super().__init__(model, data_loader, config)
+    def __init__(self,model_selector : ModelSelector, data_loader : DataLoader, config):
+        super().__init__(model_selector, data_loader, config)
         self.res_folder = None
         
     def train(self):
@@ -170,8 +176,8 @@ class TrainerFCI(Trainer):
 
         input_shape = self.data_loader.get_shape()
             
-        # Get VAE model
-        models = self.model.get_model(
+        # Get VAE model_selector
+        models = self.model_selector.get_model(
             input_shape = input_shape, 
             latent_dim  = latent_dim,
             k_loss      = kl_loss
@@ -188,8 +194,6 @@ class TrainerFCI(Trainer):
         data, label = self.data_loader.get_x_y()
 
         np.savetxt(self.res_folder / 'latent_z.txt',z)
-
-
 
         error = []
         for i in range(len(data)):
@@ -245,7 +249,7 @@ class TrainerFCI(Trainer):
         )
         
         
-        models = self.model.get_model(
+        models = self.model_selector.get_model(
             latent_dim=latent_dim
         )
 
@@ -255,8 +259,8 @@ class TrainerFCI(Trainer):
     
     
 class TrainerMNIST(Trainer):
-    def __init__(self,model : ModelSelector, data_loader : DataLoader, config):
-        super().__init__(model, data_loader, config)
+    def __init__(self,model_selector : ModelSelector, data_loader : DataLoader, config):
+        super().__init__(model_selector, data_loader, config)
         
     def train(self):
         self.train_vae()
@@ -271,8 +275,8 @@ class TrainerMNIST(Trainer):
 
         input_shape = self.data_loader.get_shape()
             
-        # Get VAE model
-        models = self.model.get_model(
+        # Get VAE model_selector
+        models = self.model_selector.get_model(
             input_shape = input_shape, 
             latent_dim  = latent_dim,
             k_loss      = kl_loss
@@ -280,7 +284,7 @@ class TrainerMNIST(Trainer):
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
         _, encoder, _ = models["vae"]
-    
+        
         # Saving latent space
         batch_size = 256
         dataset_batched, _ = self.data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
