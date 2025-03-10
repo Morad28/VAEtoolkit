@@ -13,8 +13,11 @@ class Diagnostics():
         history = self.trainer.history
         history_vae = history.get("vae", None)
         training = self.config['training']
+        gain_only = self.config["reprise"]["gain_only"]
 
-        self.save_loss(history_vae, self.trainer.res_folder)
+        
+        if not gain_only:
+            self.save_loss(history_vae, self.trainer.res_folder)
 
         for key in training:
             self.save_loss(history.get(key,None), self.trainer.res_folder / "values" /key)
