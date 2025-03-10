@@ -7,6 +7,7 @@ import os
 import json
 import matplotlib.pyplot as plt 
 from abc import ABC, abstractmethod
+import copy
 
 
 class Trainer(ABC):
@@ -86,27 +87,27 @@ class Trainer(ABC):
         
         self.models["vae"] = (autoencoder, encoder, decoder)
         
-        data_train = history.history['loss']
-        data_val = history.history['val_loss']
+        # data_train = history.history['loss']
+        # data_val = history.history['val_loss']
 
-        np.savetxt(self.res_folder / "losses.txt",[data_train,data_val])
+        # np.savetxt(self.res_folder / "losses.txt",[data_train,data_val])
         
-        plt.figure()
-        plt.grid(True,which="both")
-        plt.semilogy(data_train,label="Données d'entraînement")
-        plt.semilogy(data_val,label="Données de validation")
-        plt.ylabel("Loss")
-        plt.xlabel("Epochs")
-        plt.tick_params(axis='both', which='both', direction='in')
-        plt.legend(frameon=True)
-        plt.savefig(self.res_folder / "losses.png")
-        plt.close()
+        # plt.figure()
+        # plt.grid(True,which="both")
+        # plt.semilogy(data_train,label="Données d'entraînement")
+        # plt.semilogy(data_val,label="Données de validation")
+        # plt.ylabel("Loss")
+        # plt.xlabel("Epochs")
+        # plt.tick_params(axis='both', which='both', direction='in')
+        # plt.legend(frameon=True)
+        # plt.savefig(self.res_folder / "losses.png")
+        # plt.close()
                 
         return history
     
     def _train_mlp(self,x,y,models,res_folder_n=Path('./')):
         epoch_rna = self.config["epoch_rna"]
-        latent_gain = models["mlp"]
+        latent_gain = copy.deepcopy(models["mlp"])
 
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
                 initial_learning_rate=0.0005,
@@ -127,29 +128,27 @@ class Trainer(ABC):
             callbacks=callbacks,
             verbose = 2)
         
-        self.history["mlp"] = history
 
         latent_gain.save(res_folder_n / "model_selector.keras")
 
-        self.models["mlp"] = latent_gain
 
-        data_train = history.history['loss']
-        data_val = history.history['val_loss']
+        # data_train = history.history['loss']
+        # data_val = history.history['val_loss']
 
-        np.savetxt(res_folder_n / "losses.txt",[data_train,data_val])
+        # np.savetxt(res_folder_n / "losses.txt",[data_train,data_val])
         
-        plt.figure()
-        plt.grid(True,which="both")
-        plt.semilogy(data_train,label="Données d'entraînement")
-        plt.semilogy(data_val,label="Données de validation")
-        plt.ylabel("Loss")
-        plt.xlabel("Epochs")
-        plt.tick_params(axis='both', which='both', direction='in')
-        plt.legend(frameon=True)
-        plt.savefig(res_folder_n/ "losses.png")
-        plt.close()
+        # plt.figure()
+        # plt.grid(True,which="both")
+        # plt.semilogy(data_train,label="Données d'entraînement")
+        # plt.semilogy(data_val,label="Données de validation")
+        # plt.ylabel("Loss")
+        # plt.xlabel("Epochs")
+        # plt.tick_params(axis='both', which='both', direction='in')
+        # plt.legend(frameon=True)
+        # plt.savefig(res_folder_n/ "losses.png")
+        # plt.close()
 
-        return history
+        return history, latent_gain
 
     
     
@@ -190,27 +189,27 @@ class TrainerFCI(Trainer):
         batch_size = 256
         dataset_batched, _ = self.data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
         _, _, z = encoder.predict(dataset_batched)
-        tilde_laser = decoder.predict(z)
-        data, label = self.data_loader.get_x_y()
+        # tilde_laser = decoder.predict(z)
+        # data, label = self.data_loader.get_x_y()
 
         np.savetxt(self.res_folder / 'latent_z.txt',z)
 
-        error = []
-        for i in range(len(data)):
-            error.append( np.max(np.abs(data[i] - tilde_laser[i])) / np.max(np.abs(data[i])) )
+        # error = []
+        # for i in range(len(data)):
+        #     error.append( np.max(np.abs(data[i] - tilde_laser[i])) / np.max(np.abs(data[i])) )
 
-        plt.figure()            
-        plt.hist(np.array(error) * 100 ,bins=30)
-        plt.title("Erreur de reconstruction")
-        plt.savefig(self.res_folder / "hist_error.png")
-        plt.close()
+        # plt.figure()            
+        # plt.hist(np.array(error) * 100 ,bins=30)
+        # plt.title("Erreur de reconstruction")
+        # plt.savefig(self.res_folder / "hist_error.png")
+        # plt.close()
         
-        plt.figure()            
-        plt.hist(label ,bins=30)
-        plt.title("Distribution des gains")
-        plt.yscale("log")
-        plt.savefig(self.res_folder / "hist_gain.png")
-        plt.close()
+        # plt.figure()            
+        # plt.hist(label ,bins=30)
+        # plt.title("Distribution des gains")
+        # plt.yscale("log")
+        # plt.savefig(self.res_folder / "hist_gain.png")
+        # plt.close()
 
         return history
 
@@ -253,7 +252,10 @@ class TrainerFCI(Trainer):
             latent_dim=latent_dim
         )
 
-        history = self._train_mlp(gain_batched_train_dataset,gain_batched_validation_dataset,models,res_folder_n=res_folder_n)
+        history, latent_gain = self._train_mlp(gain_batched_train_dataset,gain_batched_validation_dataset,models,res_folder_n=res_folder_n)
+
+        self.history[var_name] = history
+        self.models[var_name] = latent_gain
 
         return history
     

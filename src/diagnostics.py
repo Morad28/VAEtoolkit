@@ -7,8 +7,9 @@ class Diagnostics():
     def __init__(self, config, trainer : Trainer):
         self.config = config
         self.trainer = trainer 
+        self.res_folder = self.trainer.res_folder
         
-    def run_diagnonstics(self):
+    def run_diagnostics(self):
         history = self.trainer.history
         history_vae = history.get("vae", None)
         training = self.config['training']
@@ -16,7 +17,7 @@ class Diagnostics():
         self.save_loss(history_vae, self.trainer.res_folder)
 
         for key in training:
-            self.save_loss(history.get(key,None))
+            self.save_loss(history.get(key,None), self.trainer.res_folder / "values" /key)
             
         self.save_errors(self.trainer.data_loader)
                 
@@ -28,7 +29,7 @@ class Diagnostics():
         data_train = history.history['loss']
         data_val = history.history['val_loss']
         
-        np.savetxt(res_folder / "losses.txt",[data_train,data_val])
+        # np.savetxt(res_folder / "losses.txt",[data_train,data_val])
         
         plt.figure()
         plt.grid(True,which="both")
@@ -42,12 +43,12 @@ class Diagnostics():
         plt.close()
         
     def save_errors(self, data_loader : DataLoader):
-        autoencoder, encoder, decoder =  self.trainer.models
+        autoencoder, encoder, decoder =  self.trainer.models["vae"]
         batch_size = 256
         dataset_batched, _ = data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
         _, _, z = encoder.predict(dataset_batched)
         tilde_laser = decoder.predict(z)
-        data, label = self.data_loader.get_x_y()
+        data, label = data_loader.get_x_y()
         
         np.savetxt(self.res_folder / 'latent_z.txt',z)
 
@@ -61,9 +62,13 @@ class Diagnostics():
         plt.savefig(self.res_folder / "hist_error.png")
         plt.close()
         
-        plt.figure()            
-        plt.hist(label ,bins=30)
-        plt.title("Distribution des gains")
-        plt.yscale("log")
-        plt.savefig(self.res_folder / "hist_gain.png")
-        plt.close()
+        training = self.config['training']
+
+        for key in training:
+            l = label * data_loader.gain_norm[key]
+            plt.figure()            
+            plt.hist(l ,bins=30)
+            plt.title("Distribution des gains")
+            plt.yscale("log")
+            plt.savefig(self.res_folder / f"hist_{key}.png")
+            plt.close()

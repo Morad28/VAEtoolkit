@@ -11,7 +11,7 @@ from src.trainer import (TrainerFCI,
 from src.latent_postprocessing import (PostprocessingFCI, 
                                        PostProcessingMNIST,
                                        PostprocessingFCI2D)
-
+from src.diagnostics import Diagnostics
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -76,8 +76,11 @@ def main():
         
         trainer = trainer_class(model, fci_dataset, config)
         trainer.train()
+
+        diag = Diagnostics(config, trainer)
+        diag.run_diagnostics()
     
-    if mode == 'visu':
+    elif mode == 'visu':
         config = get_config(args.path + "/conf.json")
         loader_class, trainer_class, postpro_class = loader(config)
 
