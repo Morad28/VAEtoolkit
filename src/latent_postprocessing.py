@@ -14,7 +14,7 @@ from tkinter import messagebox
 from abc import ABC, abstractmethod
 
 class PostprocessingBase(ABC):
-    def __init__(self, root, data_loader):
+    def __init__(self, root, data_loader : DataLoader):
         self.root = root
         self.data_loader = data_loader
         self._initialize_config()
@@ -62,6 +62,7 @@ class PostprocessingBase(ABC):
         self.encoder = self.data_loader.model["encoder"]
         self.decoder = self.data_loader.model["decoder"]
         self.vae_norm = self.data_loader.vae_norm
+        self.res_folder = self.data_loader.result_folder
         self.dim = self.latent_space.shape[1]
         self._area = []
 
@@ -146,6 +147,18 @@ class PostprocessingBase(ABC):
         self.canvas_main.mpl_connect("button_release_event", self.on_release)
         self.drawing = False  # Track if the mouse is pressed
         
+    def _save_plot(self,ax,name="plot"):
+        # Iterate over all lines in the axes
+        for line in ax:
+            x_data = line.get_xdata()
+            y_data = line.get_ydata()
+            
+            # Stack the data for saving
+            data = np.column_stack((x_data, y_data))
+            
+            # Save to a text file
+            np.savetxt(self.res_folder + f'/{name}.txt', data, header='X Y', comments='')
+        
     def quit_app(self):
         print("Application is closing...")  # For debugging/cleanup purposes
         self.root.quit()
@@ -225,8 +238,6 @@ class PostProcessingMNIST(PostprocessingBase):
         """Plot the detail plot."""
         # Create a detailed plot in the second figure based on clicked coordinates
         self.ax_detail.clear()
-        
-            
         dim = self._get_dim()
         
         axis = []
@@ -329,22 +340,22 @@ class PostprocessingFCI(PostprocessingBase):
         self.canvas_detail.draw()
         
         
-    def save_mapping(self):
-        laser_decoded = self.decoder.predict(self.decoding_dataset,verbose=0)
+    def save_mapping(self, name = "decoding"):
+        mesh, unfit = self._plot_mapping(self.x_axis_var.get(),self.y_axis_var.get())  
+        decoding_dataset = tf.data.Dataset.from_tensor_slices(unfit).batch(256)          
+        laser_decoded = self.decoder.predict(decoding_dataset,verbose=0)
         value_entry = self.gain_entry.get()
         
-        folder = os.path.join(self.data.result_folder,'/decoding')
-        if not os.path.exists(folder):
-            os.mkdir(folder)
+        gain = self.rna_gain[value_entry].predict(decoding_dataset, verbose=0) * self.gain_norm[value_entry]
+        
+        folder = self.data_loader.result_folder + f"/{name}"
+        os.makedirs(self.data_loader.result_folder + f"/{name}", exist_ok=True)
+            
+        np.savetxt(folder+f"{value_entry}_mesh.dat", mesh)
 
         for i in tqdm(range(laser_decoded.shape[0])):
-            np.savetxt(folder+f"{value_entry}_{i}.dat",
+            np.savetxt(folder+f"{value_entry}_{i}_{gain[i]}.dat",
                 list(zip(self.time,np.abs(laser_decoded[i]))))
-
-    def _update_plot(self):
-        self.ax_mapping.clear()
-        im = self.ax_mapping.pcolormesh(self._mesh[0],self._mesh[1], self._value, cmap='viridis')
-        self.canvas_mapping.draw()
 
     def _optimize(self):
         
@@ -356,9 +367,8 @@ class PostprocessingFCI(PostprocessingBase):
         xmin,xmax,ymin,ymax = self._get_min_max()
         
         bounds = [(min(xmin,ymin), max(xmax,ymax))] * dim 
-        random_samples = np.array([np.random.uniform(low, high, size=50000) for low, high in bounds]).T
+        random_samples = np.array([np.random.uniform(low, high, size=500000) for low, high in bounds]).T
         print('Random samples:', random_samples.shape)
-        print('Random samples:', random_samples[0])
         
         if self.enablePCA.get():
             pca_random_samples = (random_samples)
@@ -670,3 +680,20 @@ class PostprocessingFCI2D(PostprocessingFCI):
 
         # Redraw the canvas
         self.canvas_detail.draw()
+        
+    def save_mapping(self, name = "decoding"):
+        mesh, unfit = self._plot_mapping(self.x_axis_var.get(),self.y_axis_var.get())  
+        decoding_dataset = tf.data.Dataset.from_tensor_slices(unfit).batch(256)          
+        laser_decoded = self.decoder.predict(decoding_dataset,verbose=0)
+        value_entry = self.gain_entry.get()
+        
+        gain = self.rna_gain[value_entry].predict(decoding_dataset, verbose=0) * self.gain_norm[value_entry]
+        
+        folder = self.data_loader.result_folder + f"/{name}"
+        os.makedirs(self.data_loader.result_folder + f"/{name}", exist_ok=True)
+            
+        np.save(folder+f"{value_entry}_mesh.npy", mesh)
+
+        for i in tqdm(range(laser_decoded.shape[0])):
+            np.savetxt(folder+f"/{value_entry}_{i}_{np.squeeze(gain[i])}.dat",
+                np.column_stack((self.time,np.abs(laser_decoded[i])*np.squeeze(self.vae_norm))), header='Time(s) x(mm) ')
