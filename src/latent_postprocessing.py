@@ -696,4 +696,4 @@ class PostprocessingFCI2D(PostprocessingFCI):
 
         for i in tqdm(range(laser_decoded.shape[0])):
             np.savetxt(folder+f"/{value_entry}_{i}_{np.squeeze(gain[i])}.dat",
-                np.column_stack((self.time,np.abs(laser_decoded[i])*np.squeeze(self.vae_norm))), header='Time(s) x(mm) ')
+                np.column_stack((self.time,np.abs(laser_decoded[i])*np.squeeze(self.vae_norm))), header='Time(s) x(mm) laser_intensity density ')
