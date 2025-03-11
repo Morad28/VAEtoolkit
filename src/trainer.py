@@ -81,7 +81,7 @@ class Trainer(ABC):
         
         self.history["vae"] = history
 
-        autoencoder.save(self.res_folder / "model_selector.keras")
+        autoencoder.save(self.res_folder / "model.keras")
         encoder.save(self.res_folder / 'encoder_model.keras')
         decoder.save(self.res_folder / 'decoder_model.keras')
         
@@ -113,7 +113,7 @@ class Trainer(ABC):
             verbose = 2)
         
 
-        latent_gain.save(res_folder_n / "model_selector.keras")
+        latent_gain.save(res_folder_n / "model.keras")
 
         return history, latent_gain
 
