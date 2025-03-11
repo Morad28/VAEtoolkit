@@ -351,11 +351,11 @@ class PostprocessingFCI(PostprocessingBase):
         folder = self.data_loader.result_folder + f"/{name}"
         os.makedirs(self.data_loader.result_folder + f"/{name}", exist_ok=True)
             
-        np.savetxt(folder+f"{value_entry}_mesh.dat", mesh)
+        np.save(folder+f"{value_entry}_mesh.npy", mesh)
 
         for i in tqdm(range(laser_decoded.shape[0])):
-            np.savetxt(folder+f"{value_entry}_{i}_{gain[i]}.dat",
-                list(zip(self.time,np.abs(laser_decoded[i]))))
+            np.savetxt(folder+f"/{value_entry}_{i}_{gain[i]}.dat",
+                list(zip(self.time,np.abs(laser_decoded[i] * self.vae_norm))))
 
     def _optimize(self):
         
