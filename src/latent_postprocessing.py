@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 
 class PostprocessingBase(ABC):
     def __init__(self, root, data_loader : DataLoader):
+        os.environ['LC_NUMERIC'] = 'en_US.UTF-8'
         self.root = root
         self.data_loader = data_loader
         self._initialize_config()
@@ -138,6 +139,12 @@ class PostprocessingBase(ABC):
         self.fig_detail, self.ax_detail = plt.subplots()
         self.canvas_detail = FigureCanvasTkAgg(self.fig_detail, master=self.detail_window)
         self.canvas_detail.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        button = tk.Frame(self.detail_window)
+        button.pack(pady=10)  # Use pack() to add the button to the window with some padding
+        tk.Button(button, text="Save", command=self.save_plot).grid(row=0, column=0)
+        tk.Label(self.detail_window, text="name:").pack(side=tk.TOP)
+        self.detail_window_saving_name = tk.StringVar(value="shot.dat")
+        tk.Entry(self.detail_window, textvariable=self.detail_window_saving_name, width=20).pack(side=tk.TOP)
 
     def _bind_events(self):
         """Bind mouse events to the canvas."""
@@ -147,17 +154,8 @@ class PostprocessingBase(ABC):
         self.canvas_main.mpl_connect("button_release_event", self.on_release)
         self.drawing = False  # Track if the mouse is pressed
         
-    def _save_plot(self,ax,name="plot"):
-        # Iterate over all lines in the axes
-        for line in ax:
-            x_data = line.get_xdata()
-            y_data = line.get_ydata()
-            
-            # Stack the data for saving
-            data = np.column_stack((x_data, y_data))
-            
-            # Save to a text file
-            np.savetxt(self.res_folder + f'/{name}.txt', data, header='X Y', comments='')
+    def save_plot(self):
+        pass
         
     def quit_app(self):
         print("Application is closing...")  # For debugging/cleanup purposes
@@ -356,6 +354,24 @@ class PostprocessingFCI(PostprocessingBase):
         for i in tqdm(range(laser_decoded.shape[0])):
             np.savetxt(folder+f"/{value_entry}_{i}_{gain[i]}.dat",
                 list(zip(self.time,np.abs(laser_decoded[i] * self.vae_norm))))
+        messagebox.showinfo("Saved all data in", f"{folder}")
+        
+            
+    def save_plot(self,display_message = True):
+        # Iterate over all lines in the axes
+        ax = self.ax_detail
+        for line in ax.get_lines():
+            x_data = line.get_xdata()
+            y_data = line.get_ydata()
+            
+            # Stack the data for saving
+            data = np.column_stack((x_data, np.save(y_data)))
+            
+            # Save to a text file
+            np.savetxt(self.res_folder + f'/laser_{self.detail_window_saving_name.get()}', data, header='time laser', comments='')
+        if display_message:
+            messagebox.showinfo("Saved", f"{self.res_folder}")
+        
 
     def _optimize(self):
         
@@ -367,7 +383,7 @@ class PostprocessingFCI(PostprocessingBase):
         xmin,xmax,ymin,ymax = self._get_min_max()
         
         bounds = [(min(xmin,ymin), max(xmax,ymax))] * dim 
-        random_samples = np.array([np.random.uniform(low, high, size=500000) for low, high in bounds]).T
+        random_samples = np.array([np.random.uniform(low, high, size=50000) for low, high in bounds]).T
         print('Random samples:', random_samples.shape)
         
         if self.enablePCA.get():
@@ -413,7 +429,7 @@ class PostprocessingFCI(PostprocessingBase):
         xmin,xmax,ymin,ymax = self._get_min_max()
                 
         if hasattr(self, "slider_vars"):
-            translation_point = [self.slider_vars[i].get() for i in range(len(self.slider_vars))]
+            translation_point = [float(var.get()) for var in (self.slider_vars)]
         else:
             translation_point = [0] * self._get_dim()
         
@@ -488,10 +504,11 @@ class PostprocessingFCI(PostprocessingBase):
         Update the slider values programmatically.
         """
         for i, value in enumerate(new_values):
-            # Temporarily disable the callback to avoid infinite loops
+            # Convert the value to string, replace comma with dot, then convert to float
+            value_str = str(value)
             self.sliders[i].config(command=lambda value, idx=i: None)  # Disable callback
-            self.slider_vars[i].set(float(value))  # Update the slider value
-            self.sliders[i].config(command=lambda value, idx=i: self._on_slider_change(idx, value))  # Re-enable callback
+            self.slider_vars[i].set(float(value_str))  # Update the slider value safely
+            self.sliders[i].config(command=lambda value, idx=i: self._on_slider_change(idx, float(value_str)))  # Re-enable callback
 
         # Update the plots
         self._update_latent_space_plots()
@@ -512,15 +529,18 @@ class PostprocessingFCI(PostprocessingBase):
         self.slider_vars = []  # Store slider variables
         self.sliders = []  # Store slider widgets
         xmin, xmax, ymin, ymax = self._get_min_max()
-        from_value = np.round(min(xmin, ymin),1)
-        to_value = np.round(max(xmax, ymax),1)
-        print(from_value, to_value)
+        from_value = np.round(min(xmin, ymin),0) - 1
+        to_value = np.round(max(xmax, ymax),0) + 1
+
         for i in range(dim):
             label = tk.Label(slider_frame, text=f"Dim {i}:")
             label.pack(pady=5)
 
             # Create a slider for the current dimension
             slider_var = tk.DoubleVar(value=0.0)  # Default value for the slider
+            self.slider_vars.append(slider_var)
+            # Store the slider and its variable
+
             slider = tk.Scale(
                 slider_frame,
                 from_=from_value,  # Minimum value for the latent space dimension
@@ -529,13 +549,11 @@ class PostprocessingFCI(PostprocessingBase):
                 orient=tk.HORIZONTAL,
                 variable=slider_var,
                 length=200,
-                command=lambda value, idx=i: self._on_slider_change(idx, value), 
+                command=lambda value, idx=i: self._on_slider_change(idx, float(value)), 
             )
             slider.pack(pady=5)
-
-            # Store the slider and its variable
-            self.slider_vars.append(slider_var)
             self.sliders.append(slider)
+
 
         # Add a button to update the plots
         update_button = tk.Button(slider_frame, text="Update Plots", command=self._update_latent_space_plots)
@@ -574,11 +592,9 @@ class PostprocessingFCI(PostprocessingBase):
         Update the pairwise latent space plots based on the current slider values.
         """
         dim = self._get_dim()  # Get the dimensionality of the latent space
-        n = self._N.get()  # Get the resolution for the mapping
 
         # Get the current slider values
-        fixed_values = [float(str(var.get())) for var in self.slider_vars]
-        
+        fixed_values = [float(str(var.get())) for var in self.slider_vars]        
         # Clear the existing plots
         for i in range(dim):
             for j in range(dim):
@@ -665,7 +681,7 @@ class PostprocessingFCI2D(PostprocessingFCI):
         # Plot first dataset (Laser 1) on primary y-axis (green)
         self.ax_detail.plot(self.time[:, 0], laser[:, 0], label=f"{gain_entry}={np.squeeze(gain_val)}", color='g')
         self.ax_detail.set_xlabel('Time (s)', color='g')  # Set primary x-axis label   
-        self.ax_detail.set_ylabel('Shot laser', color='g')  # Set primary y-axis label
+        self.ax_detail.set_ylabel('Laser power (TW)', color='g')  # Set primary y-axis label
         self.ax_detail.tick_params(axis='y', labelcolor='g')  # Set color of ticks
 
         # Create second y-axis for the second dataset (Laser 2)
@@ -697,3 +713,21 @@ class PostprocessingFCI2D(PostprocessingFCI):
         for i in tqdm(range(laser_decoded.shape[0])):
             np.savetxt(folder+f"/{value_entry}_{i}_{np.squeeze(gain[i])}.dat",
                 np.column_stack((self.time,np.abs(laser_decoded[i])*np.squeeze(self.vae_norm))), header='Time(s) x(mm) laser_intensity density ')
+            
+            
+    def save_plot(self):
+        # Iterate over all lines in the axes
+        super().save_plot(display_message=False)
+
+        ax = self._ax2_detail
+        for line in ax.get_lines():
+            x_data = line.get_xdata()
+            y_data = line.get_ydata()
+            
+            # Stack the data for saving
+            data = np.column_stack((x_data, np.abs(y_data)))
+            
+            # Save to a text file
+            np.savetxt(self.res_folder + f'/density_{self.detail_window_saving_name.get()}', data, header='x density', comments='')
+
+        messagebox.showinfo("Saved", f"{self.res_folder}")
