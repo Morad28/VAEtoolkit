@@ -365,7 +365,7 @@ class PostprocessingFCI(PostprocessingBase):
             y_data = line.get_ydata()
             
             # Stack the data for saving
-            data = np.column_stack((x_data, np.save(y_data)))
+            data = np.column_stack((x_data, np.abs(y_data)))
             
             # Save to a text file
             np.savetxt(self.res_folder + f'/laser_{self.detail_window_saving_name.get()}', data, header='time laser', comments='')
@@ -675,6 +675,7 @@ class PostprocessingFCI2D(PostprocessingFCI):
         laser = self.decoder.predict(latent_point,verbose=0)[0]
         gain_val = self.rna_gain[gain_entry].predict(latent_point,verbose=0)
         gain_val = self.gain_norm[gain_entry] * (gain_val)
+        gain_val = np.round(np.squeeze(gain_val))
 
         laser = laser * np.squeeze(self.vae_norm)
         
