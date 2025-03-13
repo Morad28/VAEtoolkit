@@ -631,7 +631,7 @@ class PostprocessingFCI(PostprocessingBase):
         # Redraw the canvas
         self.canvas_mapping_all.draw()
     
-class PostprocessingFCI2D(PostprocessingFCI):
+class PostProcessingFCI2D(PostprocessingFCI):
     def __init__(self, root, data_loader: DataLoader):
         super().__init__(root, data_loader)
                

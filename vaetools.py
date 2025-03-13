@@ -1,22 +1,20 @@
 import argparse
-import os 
+import os
 import tkinter as tk
 from src.config_vae import get_config
 from src.model import ModelSelector
-from src.dataloader import (DataLoaderFCI, 
-                            DataLoaderMNIST)
-from src.trainer import (TrainerFCI, 
-                         TrainerMNIST)
-
-from src.latent_postprocessing import (PostprocessingFCI, 
-                                       PostProcessingMNIST,
-                                       PostprocessingFCI2D)
+from src.dataloader import DataLoaderFCI, DataLoaderMNIST
+from src.trainer import TrainerFCI, TrainerMNIST
+from src.latent_postprocessing import (
+    PostprocessingFCI,
+    PostProcessingMNIST,
+    PostProcessingFCI2D,
+)
 from src.diagnostics import Diagnostics
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-
-_DATA_TYPE = {
+DATA_TYPE_MAP = {
     "1DFCI": {
         "loader": DataLoaderFCI,
         "trainer": TrainerFCI,
@@ -30,73 +28,68 @@ _DATA_TYPE = {
     "2DFCI": {
         "loader": DataLoaderFCI,
         "trainer": TrainerFCI,
-        "postprocessing": PostprocessingFCI2D,
+        "postprocessing": PostProcessingFCI2D,
     },
 }
 
-
-def loader(config):
-    """Get correct classes according to configuration file.
+def get_classes(config):
+    """Retrieve appropriate classes based on configuration.
 
     Args:
-        config (dict): Config file.
+        config (dict): Configuration dictionary.
 
     Returns:
-        tuple: (DataLoader class, Trainer class, Postprocessing class)
+        tuple: DataLoader class, Trainer class, Postprocessing class.
     """
-    data_type = config.get("DataType", "1DFCI")  # Default to "1DFCI" if missing
-    classes = _DATA_TYPE.get(data_type, _DATA_TYPE["1DFCI"])  # Default if not found
-    
+    data_type = config.get("DataType", "1DFCI")
+    classes = DATA_TYPE_MAP.get(data_type, DATA_TYPE_MAP["1DFCI"])
     return classes["loader"], classes["trainer"], classes["postprocessing"]
-    
-def main():
-    """Training part of VAE model.
-    """
-    parser = argparse.ArgumentParser(description="This is a small python module to train a VAE model and to visualize the results.")
-    parser.add_argument("path", help="Path to configuration file or result folder to visualize.", default=None)
-    args = parser.parse_args() 
-    
-    if os.path.isfile(args.path) and args.path.endswith(".json"):
-        mode = 'train'
-    elif os.path.isdir(args.path):
-        mode = 'visu'    
 
-    if mode == 'train':
+def main():
+    """Main function for training or visualizing the VAE model."""
+    parser = argparse.ArgumentParser(
+        description="Train a VAE model or visualize the results."
+    )
+    parser.add_argument(
+        "path",
+        help="Path to the configuration file or result folder for visualization.",
+        default=None,
+    )
+    args = parser.parse_args()
+
+    if os.path.isfile(args.path) and args.path.endswith(".json"):
+        mode = "train"
+    elif os.path.isdir(args.path):
+        mode = "visualize"
+    else:
+        print(f"Invalid file or folder: {args.path}")
+        return
+
+    if mode == "train":
         config = get_config(args.path)
-        data_type = config.get('DataType', '1DFCI')
-        model_select = config.get('Model', {"vae" : "1D-FCI", "gain": "12MLP"})
-        loader_class, trainer_class, postpro_class = loader(config)
-        
-        # Load dataset and preprocessing
-        fci_dataset = loader_class(config)
-            
-        # Get VAE model
-        model = ModelSelector()
-        model.select(model_select)
-        
-        trainer = trainer_class(model, fci_dataset, config)
+        model_config = config.get("Model", {"vae": "1D-FCI", "gain": "12MLP"})
+        loader_class, trainer_class, postprocessing_class = get_classes(config)
+
+        dataset = loader_class(config)
+
+        model_selector = ModelSelector()
+        model_selector.select(model_config)
+
+        trainer = trainer_class(model_selector, dataset, config)
         trainer.train()
 
-        diag = Diagnostics(config, trainer)
-        diag.run_diagnostics()
-    
-    elif mode == 'visu':
-        config = get_config(args.path + "/conf.json")
-        loader_class, trainer_class, postpro_class = loader(config)
+        diagnostics = Diagnostics(config, trainer)
+        diagnostics.run_diagnostics()
 
-        data = loader_class(
-            config,
-            result_folder=args.path
-        )
+    elif mode == "visualize":
+        config = get_config(os.path.join(args.path, "conf.json"))
+        loader_class, _, postprocessing_class = get_classes(config)
+
+        dataset = loader_class(config, result_folder=args.path)
 
         root = tk.Tk()
-        vis = postpro_class(root, data)
-        root.mainloop()    
-        
-    else:
-        print("Invalid file or foler.")
-    
+        visualization = postprocessing_class(root, dataset)
+        root.mainloop()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-    
