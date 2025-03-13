@@ -174,9 +174,12 @@ class DataLoaderFCI(DataLoader):
         
         for key in self.dataset['values'].keys():
             self.dataset['values'][key] = np.array(self.dataset['values'][key])[mask]
-        
+            
         self.dataset['data'] = np.array(self.dataset['data'])[mask]
         self.dataset['name'] = np.array(self.dataset['name'])[mask]
+        
+        if self.dataset['data'].shape[0] == 0:
+            raise ValueError(f"No data left after applying filter. {gain_val} might be to high.")
 
 
     def get_shape(self):
