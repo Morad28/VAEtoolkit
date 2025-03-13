@@ -65,6 +65,15 @@ class Diagnostics():
         plt.savefig(self.res_folder / "hist_error.png")
         plt.close()
         
+        index_max = np.argmax(np.array(error))
+        
+        plt.figure()
+        plt.plot(tilde_laser[index_max], label="Reconstruction")
+        plt.plot(data[index_max], label="True")
+        plt.legend()
+        plt.savefig(self.res_folder / "max_error.png")
+        plt.close()
+        
         training = self.config['training']
 
         for key in training:
