@@ -11,5 +11,10 @@
     "latent_dim": 5,
     "batch_size_vae": 256,
     "kl_loss": 1e-5,
-    "filter" : [5,6]
+    "filter" : [5,6],
+    "training" : [],
+    "reprise" : {
+        "gain_only" : 0,
+        "result_folder" : "./testing_mnist/"
+    }
 }

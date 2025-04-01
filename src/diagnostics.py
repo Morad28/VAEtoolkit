@@ -68,8 +68,8 @@ class Diagnostics():
         index_max = np.argmax(np.array(error))
         
         plt.figure()
-        plt.plot(tilde_laser[index_max], label="Reconstruction", c = 'r')
-        plt.plot(data[index_max], label="True", c = 'g')
+        plt.plot(tilde_laser[index_max].flatten(), label="Reconstruction", c = 'r')
+        plt.plot(data[index_max].flatten(), label="True", c = 'g')
         plt.legend()
         plt.savefig(self.res_folder / "max_error.png")
         plt.close()
