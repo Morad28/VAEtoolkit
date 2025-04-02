@@ -55,9 +55,15 @@ class Diagnostics():
         
         np.savetxt(self.res_folder / 'latent_z.txt',z)
 
-        error = []
-        for i in range(len(data)):
-            error.append( np.max(np.abs(data[i] - tilde_laser[i])) / np.max(np.abs(data[i])) )
+        if self.config["DataType"] == "MNIST":
+            error = []
+            for i in range(len(data)):
+                error.append( np.sum(np.abs(data[i].reshape(28,28) - tilde_laser[i].reshape(28,28))) / np.sum(np.abs(data[i].reshape(28,28))) )
+        else:
+            error = []
+            for i in range(len(data)):
+                error.append( np.max(np.abs(data[i] - tilde_laser[i])) / np.max(np.abs(data[i])) )
+        
 
         plt.figure()            
         plt.hist(np.array(error) * 100 ,bins=30)
@@ -66,13 +72,23 @@ class Diagnostics():
         plt.close()
         
         index_max = np.argmax(np.array(error))
-        
-        plt.figure()
-        plt.plot(tilde_laser[index_max].flatten(), label="Reconstruction", c = 'r')
-        plt.plot(data[index_max].flatten(), label="True", c = 'g')
-        plt.legend()
-        plt.savefig(self.res_folder / "max_error.png")
-        plt.close()
+        if self.config["DataType"] == "MNIST":
+            plt.figure(figsize=(10,5))
+            plt.subplot(1,2,1)
+            plt.imshow(data[index_max].reshape(28,28), cmap='gray')
+            plt.title("True")
+            plt.subplot(1,2,2)
+            plt.imshow(tilde_laser[index_max].reshape(28,28), cmap='gray')
+            plt.title("Reconstruction")
+            plt.savefig(self.res_folder / "max_error.png")
+            plt.close()
+        else:
+            plt.figure()
+            plt.plot(tilde_laser[index_max], label="Reconstruction", c = 'r')
+            plt.plot(data[index_max], label="True", c = 'g')
+            plt.legend()
+            plt.savefig(self.res_folder / "max_error.png")
+            plt.close()
         
         training = self.config['training']
 

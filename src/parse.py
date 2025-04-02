@@ -80,6 +80,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        '--r-loss',
+        type=float,
+        default=1.,
+        help='r_loss weight'
+    )
+
+    parser.add_argument(
         '--gain_only',
         type=bool,
         choices=[True, False],

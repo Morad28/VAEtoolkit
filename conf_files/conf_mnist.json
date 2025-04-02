@@ -4,17 +4,17 @@
         "vae" : "2D-MNIST"
     },
     "dataset_path": "",
-    "results_dir": "testing_mnist/",
+    "results_dir": "testing_mnist_1/",
     "name": "mnist_test",
-    "epoch_vae": 10,
+    "epoch_vae": 20,
     "epoch_rna": 10,
-    "latent_dim": 5,
+    "latent_dim": 16,
     "batch_size_vae": 256,
-    "kl_loss": 1e-5,
-    "filter" : [5,6],
+    "kl_loss": 1e-6,
     "training" : [],
     "reprise" : {
         "gain_only" : 0,
-        "result_folder" : "./testing_mnist/"
-    }
+        "result_folder" : "./testing_mnist_1/"
+    },
+    "filter": [3,5,8]
 }

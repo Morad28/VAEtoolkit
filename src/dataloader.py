@@ -268,11 +268,14 @@ class DataLoaderMNIST(DataLoader):
             x_train = x_train[mask]
             y_train = y_train[mask]
         
+        # normalize data
+        x_train = x_train / np.max(x_train)
+        
         dataset = {
             "data": x_train,
             "labels": y_train
         }
-        
+
         return(dataset)
     
     def _load_model(self):

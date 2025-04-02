@@ -53,12 +53,21 @@ class Trainer(ABC):
         autoencoder, encoder, decoder = models["vae"]
 
         
-        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+        '''lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=0.001,
                     decay_steps=4000,
                     decay_rate=0.9,
                     staircase=False
-                )
+                )''' # Learning rate schedule for FCI
+        
+        # do a lr_schedule for MNIST
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=1e-4,
+            decay_steps=2500,
+            decay_rate=0.95,
+            staircase=True
+        ) # Learning rate schedule for MNIST
+
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)   
         
         autoencoder.compile(optimizer=optimizer)
@@ -217,8 +226,10 @@ class TrainerMNIST(Trainer):
 
     
     def train_vae(self):
+
         config = self.config
         kl_loss = config["kl_loss"]
+        r_loss = config["r_loss"]
         latent_dim =  config["latent_dim"]
         
         dataset = self.data_loader.get_tf_dataset()
@@ -229,7 +240,8 @@ class TrainerMNIST(Trainer):
         models = self.model_selector.get_model(
             input_shape = input_shape, 
             latent_dim  = latent_dim,
-            k_loss      = kl_loss
+            k_loss      = kl_loss,
+            r_loss      = r_loss
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)

@@ -169,18 +169,31 @@ class PostprocessingBase(ABC):
         _, gg = self.get_label()
         
         self._pca = PCA(n_components=self._pca_dim.get())
-        
-        if self.enablePCA.get():
-            latent_space = self._pca.fit_transform(self.latent_space)
-            explained_var = self._pca.explained_variance_ratio_
-            sc = self.ax_main.scatter(latent_space[:, self.x_axis_var.get()], latent_space[:, self.y_axis_var.get()], c = gg)
-            self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()} ({explained_var[self.x_axis_var.get()]:.2f})")
-            self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()} ({explained_var[self.y_axis_var.get()]:.2f})")
+        if self.config["DataType"] == "MNIST":
+            if self.enablePCA.get():
+                latent_space = self._pca.fit_transform(self.latent_space)
+                explained_var = self._pca.explained_variance_ratio_
+                sc = self.ax_main.scatter(latent_space[:, self.x_axis_var.get()], latent_space[:, self.y_axis_var.get()], c = gg, cmap='tab10')
+                self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()} ({explained_var[self.x_axis_var.get()]:.2f})")
+                self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()} ({explained_var[self.y_axis_var.get()]:.2f})")
+
+            else:
+                sc = self.ax_main.scatter(self.latent_space[:, self.x_axis_var.get()], self.latent_space[:, self.y_axis_var.get()], c = gg, cmap='tab10')
+                self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()}")
+                self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()}")
 
         else:
-            sc = self.ax_main.scatter(self.latent_space[:, self.x_axis_var.get()], self.latent_space[:, self.y_axis_var.get()], c = gg)
-            self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()}")
-            self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()}")
+            if self.enablePCA.get():
+                latent_space = self._pca.fit_transform(self.latent_space)
+                explained_var = self._pca.explained_variance_ratio_
+                sc = self.ax_main.scatter(latent_space[:, self.x_axis_var.get()], latent_space[:, self.y_axis_var.get()], c = gg)
+                self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()} ({explained_var[self.x_axis_var.get()]:.2f})")
+                self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()} ({explained_var[self.y_axis_var.get()]:.2f})")
+
+            else:
+                sc = self.ax_main.scatter(self.latent_space[:, self.x_axis_var.get()], self.latent_space[:, self.y_axis_var.get()], c = gg)
+                self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()}")
+                self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()}")
             
         if hasattr(self, 'scatter_cb'):
             self.scatter_cb.update_normal(sc)
@@ -253,7 +266,7 @@ class PostProcessingMNIST(PostprocessingBase):
 
         laser = self.decoder.predict(latent_point,verbose=0)[0]
     
-        self.ax_detail.imshow(laser)
+        self.ax_detail.imshow(laser, cmap="gray")
         self.ax_detail.set_title("Profiles")
         self.ax_detail.legend()
         self.canvas_detail.draw()

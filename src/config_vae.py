@@ -13,6 +13,7 @@ def get_config(path):
         "batch_size_vae": 64,
         "batch_size_rna": 32,
         "kl_loss": 1e-4,
+        "r_loss": 1.0,
         "vae_normalization": 1,
         "log": False
     }
