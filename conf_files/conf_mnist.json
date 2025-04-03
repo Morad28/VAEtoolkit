@@ -8,13 +8,13 @@
     "name": "mnist_test",
     "epoch_vae": 20,
     "epoch_rna": 10,
-    "latent_dim": 16,
+    "latent_dim": 5,
     "batch_size_vae": 256,
-    "kl_loss": 1e-6,
+    "kl_loss": 5e-5,
     "training" : [],
     "reprise" : {
         "gain_only" : 0,
         "result_folder" : "./testing_mnist_1/"
     },
-    "filter": [3,5,8]
+    "filter": [1,4,7]
 }
