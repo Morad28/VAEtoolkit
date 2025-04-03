@@ -58,18 +58,43 @@ class Diagnostics():
         if self.config["DataType"] == "MNIST":
             error = []
             for i in range(len(data)):
-                error.append( np.sum(np.abs(data[i].reshape(28,28) - tilde_laser[i].reshape(28,28))) / np.sum(np.abs(data[i].reshape(28,28))) )
+                error.append( np.sum((data[i].reshape(28,28) - tilde_laser[i].reshape(28,28))**2) / np.sum((data[i].reshape(28,28))**2) )
+            plt.figure()            
+            plt.hist(np.array(error) * 100 ,bins=30)
+            plt.title("Erreur de reconstruction mse")
+            plt.savefig(self.res_folder / "hist_mse.png")
+            plt.close()
+
+            error2 = []
+            for i in range(len(data)):
+                error2.append( np.max(np.abs(data[i].reshape(28,28) - tilde_laser[i].reshape(28,28))) / np.max(np.abs(data[i].reshape(28,28))) )
+            plt.figure()
+            plt.hist(np.array(error2) * 100 ,bins=30)
+            plt.title("Erreur de reconstruction max")
+            plt.savefig(self.res_folder / "hist_max.png")
+            plt.close()
+
+            error3 = []
+            for i in range(len(data)):
+                error3.append( np.sum(np.abs(data[i].reshape(28,28) - tilde_laser[i].reshape(28,28))) / np.sum(np.abs(data[i].reshape(28,28))) )
+            plt.figure()
+            plt.hist(np.array(error3) * 100 ,bins=30)
+            plt.title("Erreur de reconstruction MAE")
+            plt.savefig(self.res_folder / "hist_mae.png")
+            plt.close()
+
         else:
             error = []
             for i in range(len(data)):
                 error.append( np.max(np.abs(data[i] - tilde_laser[i])) / np.max(np.abs(data[i])) )
+            plt.figure()            
+            plt.hist(np.array(error) * 100 ,bins=30)
+            plt.title("Erreur de reconstruction")
+            plt.savefig(self.res_folder / "hist_error.png")
+            plt.close()
         
 
-        plt.figure()            
-        plt.hist(np.array(error) * 100 ,bins=30)
-        plt.title("Erreur de reconstruction")
-        plt.savefig(self.res_folder / "hist_error.png")
-        plt.close()
+        
         
         index_max = np.argmax(np.array(error))
         if self.config["DataType"] == "MNIST":
