@@ -49,7 +49,7 @@ class Diagnostics():
         autoencoder, encoder, decoder =  self.trainer.models["vae"]
         batch_size = 256
         dataset_batched, _ = data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
-        _, _, z = encoder.predict(dataset_batched)
+        z = encoder.predict(dataset_batched)[-1]
         tilde_laser = decoder.predict(z)
         data, label = data_loader.get_x_y()
         

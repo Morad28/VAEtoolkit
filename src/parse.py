@@ -59,6 +59,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        '--num-components',
+        type=int,
+        default=3,
+        help='Number of components in the mixture model'
+    )
+
+    parser.add_argument(
         '--batch_size_vae',
         type=int,
         default=64,

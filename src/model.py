@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 from keras import layers, losses, Model
 from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTranspose, MaxPooling2D, Flatten, Reshape, MaxPooling1D
-from src.vae_class import VAE, Sampling
+from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG
 
 
 
@@ -14,14 +14,14 @@ class ModelSelector:
         self.vae = kwargs.get('vae', None)
         self.gain = kwargs.get('gain', None)
         
-    def get_model(self,input_shape=(512,1), latent_dim=5,r_loss=1., k_loss=1., gain_loss=0.):
+    def get_model(self,input_shape=(512,1), latent_dim=5, num_components=3, r_loss=1., k_loss=1., gain_loss=0.):
         s = {}
         if self.vae == '1D-FCI':
             s["vae"] = self._get_1d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
         if self.vae == '2D-FCI':
             s["vae"] = self._get_2d_vae_fci(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
-        if self.vae == '2D-MNIST':
-            s["vae"] = self._get_2d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
+        if self.vae == '2D-MNIST' or self.vae == '2D-MNIST-MoG':
+            s["vae"] = self._get_2d_vae(input_shape=input_shape, latent_dim=latent_dim, num_components=num_components, r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
         if self.gain == '12MLP':
             s["mlp"] = self._get_gain_network_12_mlp(latent_dim)
         if not bool(s):
@@ -183,7 +183,7 @@ class ModelSelector:
 
         return autoencoder, encoder, decoder
    
-    def _get_2d_vae(self,input_shape=(28, 28, 1), latent_dim=5, r_loss=0., k_loss=1., gain_loss=0.):
+    def _get_2d_vae(self,input_shape=(28, 28, 1), latent_dim=5, num_components=3, r_loss=0., k_loss=1., gain_loss=0.):
         """For training on 2D image input (28x28)
 
         Args:
@@ -207,11 +207,28 @@ class ModelSelector:
         x         = layers.BatchNormalization()(x)
         x         = layers.Flatten()(x)
 
-        z_mean    = layers.Dense(latent_dim, name="z_mean")(x)
-        z_log_var = layers.Dense(latent_dim, name="z_log_var")(x)
-        z         = Sampling()([z_mean, z_log_var])
-        encoder = Model(inputs, [z_mean, z_log_var, z], name="encoder")
-        encoder.compile()
+        if self.vae == '2D-MNIST':
+            z_mean    = layers.Dense(latent_dim, name="z_mean")(x)
+            z_log_var = layers.Dense(latent_dim, name="z_log_var")(x)
+            z         = Sampling()([z_mean, z_log_var])
+            encoder = Model(inputs, [z_mean, z_log_var, z], name="encoder")
+            encoder.compile()
+        
+        if self.vae == '2D-MNIST-MoG':
+            # Define z_means, z_log_vars, and z_pis for each component
+            z_means = layers.Dense(num_components * latent_dim, name="z_means")(x)
+            z_means = layers.Reshape((num_components, latent_dim))(z_means)
+
+            z_log_vars = layers.Dense(num_components * latent_dim, name="z_log_vars")(x)
+            z_log_vars = layers.Reshape((num_components, latent_dim))(z_log_vars)
+
+            z_pis = layers.Dense(num_components, activation="softmax", name="z_pis")(x)
+
+            # Sampling from the Mixture of Gaussians
+            z = SamplingMoG()([z_means, z_log_vars, z_pis])
+
+            encoder = Model(inputs, [z_means, z_log_vars, z_pis, z], name="encoder")
+            encoder.compile()
 
         latent_inputs = Input(shape=(latent_dim,))
         x       = layers.Dense(7 * 7 * 128, activation="relu")(latent_inputs)
@@ -225,8 +242,11 @@ class ModelSelector:
 
         print(encoder.summary())
         print(decoder.summary())
-
-        autoencoder = VAE(encoder, decoder, [r_loss, k_loss, gain_loss])
+        
+        if self.vae == '2D-MNIST':
+            autoencoder = VAE(encoder, decoder, [r_loss, k_loss, gain_loss])
+        elif self.vae == '2D-MNIST-MoG':
+            autoencoder = VAE_MoG(encoder, decoder, [r_loss, k_loss, gain_loss])
         return autoencoder, encoder, decoder 
     
     def _get_gain_network_12_mlp(self,input_shape, output_shape = 1):

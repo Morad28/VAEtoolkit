@@ -231,6 +231,7 @@ class TrainerMNIST(Trainer):
         kl_loss = config["kl_loss"]
         r_loss = config["r_loss"]
         latent_dim =  config["latent_dim"]
+        num_components = config["num_components"]
         
         dataset = self.data_loader.get_tf_dataset()
 
@@ -240,6 +241,7 @@ class TrainerMNIST(Trainer):
         models = self.model_selector.get_model(
             input_shape = input_shape, 
             latent_dim  = latent_dim,
+            num_components = num_components,
             k_loss      = kl_loss,
             r_loss      = r_loss
         )
@@ -250,6 +252,6 @@ class TrainerMNIST(Trainer):
         # Saving latent space
         batch_size = 256
         dataset_batched, _ = self.data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
-        _, _, z = encoder.predict(dataset_batched)
+        z = encoder.predict(dataset_batched)[-1]
         np.savetxt(self.res_folder / 'latent_z.txt',z)
         return history
