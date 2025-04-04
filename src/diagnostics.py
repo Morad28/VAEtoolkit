@@ -56,6 +56,7 @@ class Diagnostics():
         np.savetxt(self.res_folder / 'latent_z.txt',z)
 
         if self.config["DataType"] == "MNIST":
+            # erreur mse : somme des carrés des différences entre l'image d'origine et l'image reconstruite
             error = []
             for i in range(len(data)):
                 error.append( np.sum((data[i].reshape(28,28) - tilde_laser[i].reshape(28,28))**2) / np.sum((data[i].reshape(28,28))**2) )
@@ -65,15 +66,17 @@ class Diagnostics():
             plt.savefig(self.res_folder / "hist_mse.png")
             plt.close()
 
+            # erreur max : plus grand écart entre un pixel de l'image d'origine et de l'image reconstruite
             error2 = []
             for i in range(len(data)):
                 error2.append( np.max(np.abs(data[i].reshape(28,28) - tilde_laser[i].reshape(28,28))) / np.max(np.abs(data[i].reshape(28,28))) )
             plt.figure()
             plt.hist(np.array(error2) * 100 ,bins=30)
-            plt.title("Erreur de reconstruction max")
-            plt.savefig(self.res_folder / "hist_max.png")
+            plt.title("Erreur de reconstruction absolue")
+            plt.savefig(self.res_folder / "hist_abs.png")
             plt.close()
 
+            # erreur mae : somme des différences entre l'image d'origine et l'image reconstruite
             error3 = []
             for i in range(len(data)):
                 error3.append( np.sum(np.abs(data[i].reshape(28,28) - tilde_laser[i].reshape(28,28))) / np.sum(np.abs(data[i].reshape(28,28))) )
@@ -112,10 +115,10 @@ class Diagnostics():
             plt.title("Image reconstruite mse")
             plt.subplot(3, 2, 3)
             plt.imshow(data[index_max_max].reshape(28,28), cmap='gray')
-            plt.title("Image d'origine max")
+            plt.title("Image d'origine abs")
             plt.subplot(3, 2, 4)
             plt.imshow(tilde_laser[index_max_max].reshape(28,28), cmap='gray')
-            plt.title("Image reconstruite max")
+            plt.title("Image reconstruite abs")
             plt.subplot(3, 2, 5)
             plt.imshow(data[index_max_mae].reshape(28,28), cmap='gray')
             plt.title("Image d'origine mae")
@@ -134,10 +137,10 @@ class Diagnostics():
             plt.title("Image reconstruite mse")
             plt.subplot(3, 2, 3)
             plt.imshow(data[index_min_max].reshape(28,28), cmap='gray')
-            plt.title("Image d'origine max")
+            plt.title("Image d'origine abs")
             plt.subplot(3, 2, 4)
             plt.imshow(tilde_laser[index_min_max].reshape(28,28), cmap='gray')
-            plt.title("Image reconstruite max")
+            plt.title("Image reconstruite abs")
             plt.subplot(3, 2, 5)
             plt.imshow(data[index_min_mae].reshape(28,28), cmap='gray')
             plt.title("Image d'origine mae")
