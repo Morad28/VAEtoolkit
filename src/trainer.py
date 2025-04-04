@@ -33,13 +33,19 @@ class Trainer(ABC):
 
     def _create_folder(self):
         results_dir = self.config["results_dir"]
+        epoch_vae = self.config["epoch_vae"]
         name = self.config["name"]
         latent_dim = self.config["latent_dim"]
         kl_loss = self.config["kl_loss"]
+        num_components = self.config["num_components"]
         batch_size_vae = self.config["batch_size_vae"]
+        model = self.config["Model"]["vae"]
         results_path = Path(results_dir)
         results_path.mkdir(parents=True, exist_ok=True)
-        folder_name = f"std_{name}_{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}"
+        folder_name = f"std_{name}_{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}_{model}"
+        if model == "2D-MNIST-MoG":
+            folder_name += f"_gaussians_{num_components}"
+        folder_name += f"_epochs_{epoch_vae}"
         self.res_folder = results_path / folder_name
         os.makedirs(os.path.dirname(self.res_folder / 'conf.json'), exist_ok=True)
         self.config["dataset_path"] = os.path.abspath(self.config["dataset_path"])
