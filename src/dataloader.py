@@ -269,6 +269,13 @@ class DataLoaderMNIST(DataLoader):
             y_train = y_train[mask]
         
         # normalize data
+        ''' Z-score normalization
+        mean = np.mean(x_train)
+        std = np.std(x_train)
+        print(f"Mean: {mean}, Std: {std}")
+        x_train = (x_train - mean) / std'''
+
+        # Min-max normalization
         x_train = x_train / np.max(x_train)
         
         dataset = {

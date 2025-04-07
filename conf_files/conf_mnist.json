@@ -1,15 +1,15 @@
 {
     "DataType" : "MNIST",
     "Model" : {
-        "vae" : "2D-MNIST-MoG"
+        "vae" : "2D-MNIST"
     },
     "dataset_path": "",
     "results_dir": "testing_mnist_1/",
     "name": "mnist_test",
-    "epoch_vae": 20,
+    "epoch_vae": 12,
     "epoch_rna": 10,
     "latent_dim": 5,
-    "num_components": 6,
+    "num_components": 1,
     "batch_size_vae": 256,
     "kl_loss": 1e-5,
     "training" : [],

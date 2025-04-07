@@ -1,0 +1,25 @@
+{
+    "DataType" : "1DFCI",
+    "Model" : {
+        "vae" : "1D-FCI",
+        "gain": "12MLP"
+    },
+    "dataset_path": "datasets/dataset_light_correct.npy",
+    "results_dir": "testing_coils/",
+    "name": "dyn-shell",
+    "epoch_vae": 5,
+    "epoch_rna": 3,
+    "latent_dim": 5,
+    "batch_size_vae": 256,
+    "batch_size_rna": 128,
+    "kl_loss": 1e-5,
+    "training" : ["gain"],
+    "num_components" : 5,
+    "reprise" : {
+        "gain_only" : 0,
+        "result_folder" : "./testing_coils/"
+    },
+    "filter" : {
+        "gain" : 2e-6
+    }
+}
