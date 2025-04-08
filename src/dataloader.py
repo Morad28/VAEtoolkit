@@ -280,7 +280,10 @@ class DataLoaderGain(DataLoader):
         # Normalize data to be in the range [-1, 1]
         self.dataset['data'] = np.array(self.dataset['data'])
         
-        self.dataset['data'] = self.dataset['data'] / self.vae_norm
+        # Z-scoring normalization
+        mean = self.vae_norm["mean"]
+        std = self.vae_norm["std"]
+        self.dataset['data'] = (self.dataset['data'] - mean) / std
 
         
     def apply_mask(self,filter):
@@ -312,11 +315,10 @@ class DataLoaderGain(DataLoader):
         loaded_dataset['data'] = np.array(loaded_dataset['data'])
         loaded_dataset['values']['gain'] = np.array(loaded_dataset['values']['gain'])
         
-        if len(loaded_dataset["data"].shape) == 2:
-            self.vae_norm  =  np.max(loaded_dataset["data"])
-        elif len(loaded_dataset["data"].shape) == 3:
-            self.vae_norm  =  np.max(loaded_dataset["data"], axis=(0, 1), keepdims=True)
-        
+        std = np.std(loaded_dataset["data"])
+        mean = np.mean(loaded_dataset["data"])
+        self.vae_norm = {"mean": mean, "std": std}
+
         for key in loaded_dataset["values"]:
             self.gain_norm[key] = np.max(loaded_dataset["values"][key])
         

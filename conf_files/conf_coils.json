@@ -7,7 +7,7 @@
     "dataset_path": "datasets/dataset_light_correct.npy",
     "results_dir": "testing_coils/",
     "name": "dyn-shell",
-    "epoch_vae": 100,
+    "epoch_vae": 500,
     "epoch_rna": 5,
     "latent_dim": 5,
     "batch_size_vae": 256,

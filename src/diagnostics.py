@@ -86,6 +86,33 @@ class Diagnostics():
             plt.savefig(self.res_folder / "hist_mae.png")
             plt.close()
 
+        elif self.config["DataType"] == "1DFCI-GAIN":
+            vae_norm = data_loader.vae_norm
+            predicted_gain = tilde_laser[:,-1] * vae_norm["std"] + vae_norm["mean"]
+            predicted_laser = tilde_laser[:,:-1] * vae_norm["std"] + vae_norm["mean"]
+            gain = data[:,-1] * vae_norm["std"] + vae_norm["mean"]
+            laser = data[:,:-1] * vae_norm["std"] + vae_norm["mean"]
+
+            error_gain = []
+            for i in range(len(data)):
+                error_gain.append( np.max(np.abs(gain[i] - predicted_gain[i])) / np.max(np.abs(gain[i])) )
+            
+            error_laser = []
+            for i in range(len(data)):
+                error_laser.append( np.max(np.abs(laser[i] - predicted_laser[i])) / np.max(np.abs(laser[i])) )
+            
+            plt.figure()
+            plt.hist(np.array(error_gain) * 100 ,bins=30)
+            plt.title("Erreur de reconstruction gain")
+            plt.savefig(self.res_folder / "hist_gain.png")
+            plt.close()
+
+            plt.figure()
+            plt.hist(np.array(error_laser) * 100 ,bins=30)
+            plt.title("Erreur de reconstruction laser")
+            plt.savefig(self.res_folder / "hist_laser.png")
+            plt.close()
+
         else:
             error = []
             for i in range(len(data)):
@@ -149,6 +176,41 @@ class Diagnostics():
             plt.title("Image reconstruite mae")
             plt.savefig(self.res_folder / "min_error.png")
             plt.close()
+
+        elif self.config["DataType"] == "1DFCI-GAIN":
+            index_max_gain = np.argmax(np.array(error_gain))
+            index_max_laser = np.argmax(np.array(error_laser))
+            index_min_gain = np.argmin(np.array(error_gain))
+            index_min_laser = np.argmin(np.array(error_laser))
+
+            plt.figure()
+            plt.plot(predicted_laser[index_max_laser], label=f"Reconstruction, gain = {predicted_gain[index_max_laser]} ", c = 'r')
+            plt.plot(laser[index_max_laser], label=f"True, gain = {gain[index_max_laser]} ", c = 'g')
+            plt.legend()
+            plt.savefig(self.res_folder / "max_error_laser.png")
+            plt.close()
+
+            plt.figure()
+            plt.plot(predicted_laser[index_max_gain], label=f"Reconstruction, gain = {predicted_gain[index_max_gain]} ", c = 'r')
+            plt.plot(laser[index_max_gain], label=f"True, gain = {gain[index_max_gain]} ", c = 'g')
+            plt.legend()
+            plt.savefig(self.res_folder / "max_error_gain.png")
+            plt.close()
+
+            plt.figure()
+            plt.plot(predicted_laser[index_min_laser], label=f"Reconstruction, gain = {predicted_gain[index_min_laser]} ", c = 'r')
+            plt.plot(laser[index_min_laser], label=f"True, gain = {gain[index_min_laser]} ", c = 'g')
+            plt.legend()
+            plt.savefig(self.res_folder / "min_error_laser.png")
+            plt.close()
+
+            plt.figure()
+            plt.plot(predicted_laser[index_min_gain], label=f"Reconstruction, gain = {predicted_gain[index_min_gain]} ", c = 'r')
+            plt.plot(laser[index_min_gain], label=f"True, gain = {gain[index_min_gain]} ", c = 'g')
+            plt.legend()
+            plt.savefig(self.res_folder / "min_error_gain.png")
+            plt.close()
+
 
         else:
             index_max = np.argmax(np.array(error))
