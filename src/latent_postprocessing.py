@@ -643,6 +643,377 @@ class PostprocessingFCI(PostprocessingBase):
 
         # Redraw the canvas
         self.canvas_mapping_all.draw()
+
+class PostprocessingGain(PostprocessingBase):
+    def __init__(self, root, data_loader: DataLoader):
+        super().__init__(root, data_loader)
+
+    def _initialize_model_components(self):
+        
+        super()._initialize_model_components()
+        self.gain =  self.data_loader.dataset['values']
+        self.time =  self.data_loader.dataset['time']
+        self.filtered = self.config["filter"]
+
+        key = list(self.filtered.keys())[0]
+        gain_val = np.array(self.gain[key])
+        mask = gain_val >= self.filtered[key]
+
+        for key in self.gain.keys():
+            self.gain[key] = np.array(self.gain[key])[mask]
+            
+        self.x_max = None
+        self.gain_norm = self.data_loader.gain_norm
+        self.vae_norm = self.data_loader.vae_norm     
+        
+    def add_custom_buttons(self, parent):
+        tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)
+        tk.Button(parent, text="Optimize", command=self.find_best).pack(pady=10)
+        tk.Button(parent, text="Slices", command=self.show_latent_space).pack(pady=5)
+
+    def get_label(self):
+        return self.gain_entry.get(), self.gain[self.gain_entry.get()]
+
+    def add_settings(self, parent):
+        options = list(self.gain.keys())
+        tk.Label(parent, text="Select value").pack(side=tk.TOP)
+        self.gain_entry = tk.StringVar(value="gain") # Default to heatmap based on gain
+        self.gain_entry.trace_add("write", self.plot_main)
+        gain_entry_menu = tk.OptionMenu(parent, self.gain_entry, *options)
+        gain_entry_menu.pack(side=tk.TOP)
+
+    def plot_detail(self, coord):
+        # Create a detailed plot in the second figure based on clicked coordinates
+        self.ax_detail.clear()
+        
+        gain_entry = self.gain_entry.get()
+        
+        if self.enablePCA.get():
+            dim = self._pca_dim.get()
+        else:
+            dim = self.dim
+        
+        axis = []
+        
+        for i in list(set(range(dim)) - {self.x_axis_var.get(), self.y_axis_var.get()}):
+            axis.append(i)
+        
+        latent_point = np.zeros((1,dim))
+        latent_point[0,self.x_axis_var.get()] = coord[0]
+        latent_point[0,self.y_axis_var.get()] = coord[1]
+        if self.x_max is not None and len(axis)>0:
+            for a in axis:
+                latent_point[0,a] = self.x_max[a]
+        
+        if self.enablePCA.get():
+            latent_point = self._pca.inverse_transform(latent_point[0]).reshape(1,self.dim)
+        else:
+            dim = self.dim
+
+        prediction = self.decoder.predict(latent_point,verbose=0)[0]
+        laser = prediction[:-1]
+        gain_val = prediction[-1] * self.vae_norm
+    
+        self.ax_detail.plot(self.time, laser * self.vae_norm, label=f" {gain_entry}={gain_val}")
+        self.ax_detail.set_title("Profiles")
+        self.ax_detail.legend()
+        self.canvas_detail.draw()
+        
+        
+    def save_mapping(self, name = "decoding"):
+        mesh, unfit = self._plot_mapping(self.x_axis_var.get(),self.y_axis_var.get())  
+        decoding_dataset = tf.data.Dataset.from_tensor_slices(unfit).batch(256)          
+        laser_decoded = self.decoder.predict(decoding_dataset,verbose=0)
+        value_entry = self.gain_entry.get()
+        
+        gain = laser_decoded[:,-1] * self.vae_norm
+        laser_decoded = laser_decoded[:,:-1]
+        
+        folder = self.data_loader.result_folder + f"/{name}"
+        os.makedirs(self.data_loader.result_folder + f"/{name}", exist_ok=True)
+            
+        np.save(folder+f"{value_entry}_mesh.npy", mesh)
+
+        for i in tqdm(range(laser_decoded.shape[0])):
+            np.savetxt(folder+f"/{value_entry}_{i}_{gain[i]}.dat",
+                list(zip(self.time,np.abs(laser_decoded[i] * self.vae_norm))))
+        messagebox.showinfo("Saved all data in", f"{folder}")
+        
+            
+    def save_plot(self,display_message = True):
+        # Iterate over all lines in the axes
+        ax = self.ax_detail
+        for line in ax.get_lines():
+            x_data = line.get_xdata()
+            y_data = line.get_ydata()
+            
+            # Stack the data for saving
+            data = np.column_stack((x_data, np.abs(y_data)))
+            
+            # Save to a text file
+            np.savetxt(self.res_folder + f'/laser_{self.detail_window_saving_name.get()}', data, header='time laser', comments='')
+        if display_message:
+            messagebox.showinfo("Saved", f"{self.res_folder}")
+        
+
+    def _optimize(self):
+        
+        if self.enablePCA.get():
+            dim = self._pca_dim.get()
+        else:
+            dim = self.dim
+            
+        xmin,xmax,ymin,ymax = self._get_min_max()
+        
+        bounds = [(min(xmin,ymin), max(xmax,ymax))] * dim 
+        random_samples = np.array([np.random.uniform(low, high, size=50000) for low, high in bounds]).T
+        print('Random samples:', random_samples.shape)
+        
+        if self.enablePCA.get():
+            pca_random_samples = (random_samples)
+            random_samples = self._pca.inverse_transform(pca_random_samples)
+        
+        predictions = self.decoder.predict(random_samples, verbose=0)[:,-1] * self.vae_norm
+        
+        # Find the maximum
+        max_index = np.argmax(predictions)
+        if self.enablePCA.get():
+            best_x = pca_random_samples[max_index]
+        else:
+            best_x = random_samples[max_index]
+            
+        max_value = predictions[max_index]
+
+        print("Best x:", best_x)
+        print("Max value:", max_value)
+        
+        self.update_slider_values(best_x)
+        messagebox.showinfo("Optimization done", f"f(x_max) = {max_value}")
+        
+        self.x_max = best_x
+
+    def find_best(self):
+        threading.Thread(target=self._optimize).start()
+        
+    def _get_min_max(self):
+        
+        if len(self._area) < 2:
+            return (-3, 3, -3, 3)
+        
+        xmin = min(np.array(self._area)[:,0])
+        xmax = max(np.array(self._area)[:,0])
+        ymin = min(np.array(self._area)[:,1])
+        ymax = max(np.array(self._area)[:,1])
+        
+        return(xmin,xmax,ymin,ymax)
+    
+    def _plot_mapping(self,x_axis,y_axis):
+        
+        xmin,xmax,ymin,ymax = self._get_min_max()
+                
+        if hasattr(self, "slider_vars"):
+            translation_point = [float(var.get()) for var in (self.slider_vars)]
+        else:
+            translation_point = [0] * self._get_dim()
+        
+        n = self._N.get()
+        x = np.linspace(xmin,xmax,n)
+        y = np.linspace(ymin,ymax,n)
+        mesh = np.meshgrid(x,y)
+        grid = np.vstack([m.flatten() for m in mesh]).T
+        axis = []
+
+        if self.enablePCA.get() and self._pca_dim.get() == 2:
+            unfit = self._pca.inverse_transform(grid)
+        elif self.enablePCA.get() and self._pca_dim.get() > 2:
+            for i in list(set(range(self._pca_dim.get())) - {x_axis, y_axis}):
+                axis.append(i)
+            unfit = np.zeros((grid.shape[0],self._pca_dim.get() ))                
+            unfit[:,x_axis] = grid[:,0]
+            unfit[:,y_axis] = grid[:,1]
+            for a in axis:
+                unfit[:,a] = translation_point[a]
+            unfit = self._pca.inverse_transform(unfit)
+        else:
+            for i in list(set(range(self.dim)) - {x_axis, y_axis}):
+                axis.append(i)
+            unfit = np.zeros((grid.shape[0],self.dim ))
+            unfit[:,x_axis] = grid[:,0]
+            unfit[:,y_axis] = grid[:,1]
+            for a in axis:
+                unfit[:,a] = translation_point[a]
+        
+        return mesh,unfit
+
+
+    def plot_mapping(self):
+        
+        value_entry = self.gain_entry.get()
+        
+        self.mapping_window = tk.Toplevel(self.root)
+        self.mapping_window.title("Mapping")
+        
+        # Create the button
+        button = tk.Frame(self.mapping_window)
+        button.pack(pady=10)  # Use pack() to add the button to the window with some padding
+        
+        tk.Button(button, text="Save", command=self.save_mapping).grid(row=0, column=0)
+
+        self.fig_mapping, self.ax_mapping = plt.subplots()
+        self.canvas_mapping = FigureCanvasTkAgg(self.fig_mapping, master=self.mapping_window)
+        self.canvas_mapping.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self.canvas_mapping.mpl_connect("button_press_event", self.on_click)
+        self.canvas_mapping.mpl_connect("button_press_event", self.on_press)
+        self.canvas_mapping.mpl_connect("motion_notify_event", self.on_motion)
+        self.canvas_mapping.mpl_connect("button_release_event", self.on_release)
+        
+        n = self._N.get()
+        mesh, unfit = self._plot_mapping(self.x_axis_var.get(),self.y_axis_var.get())            
+        
+        value = self._predict_gain(unfit)
+
+        im = self.ax_mapping.pcolormesh(mesh[0],mesh[1], value, cmap='viridis')
+        self.ax_mapping.set_aspect('equal')
+        
+        if hasattr(self, 'mapping_cb'):
+            self.mapping_cb.remove()  
+        self.mapping_cb = self.fig_mapping.colorbar(im, ax=self.ax_mapping)
+ 
+        self.ax_mapping.set_title(value_entry)
+        self.canvas_mapping.draw()
+    
+    def update_slider_values(self, new_values):
+        """
+        Update the slider values programmatically.
+        """
+        for i, value in enumerate(new_values):
+            # Convert the value to string, replace comma with dot, then convert to float
+            value_str = str(value)
+            self.sliders[i].config(command=lambda value, idx=i: None)  # Disable callback
+            self.slider_vars[i].set(float(value_str))  # Update the slider value safely
+            self.sliders[i].config(command=lambda value, idx=i: self._on_slider_change(idx, float(value_str)))  # Re-enable callback
+
+        # Update the plots
+        self._update_latent_space_plots()
+        
+    def show_latent_space(self):
+        dim = self._get_dim()  # Get the dimensionality of the latent space
+        n = self._N.get()  # Get the resolution for the mapping
+
+        # Create a new window for the latent space visualization
+        mapping_window_all = tk.Toplevel(self.root)
+        mapping_window_all.title("Latent Space Slices with Sliders")
+
+        # Create a frame for the sliders
+        slider_frame = tk.Frame(mapping_window_all)
+        slider_frame.pack(side=tk.LEFT, fill=tk.Y)
+
+        # Create sliders for each dimension
+        self.slider_vars = []  # Store slider variables
+        self.sliders = []  # Store slider widgets
+        xmin, xmax, ymin, ymax = self._get_min_max()
+        from_value = np.round(min(xmin, ymin),0) - 1
+        to_value = np.round(max(xmax, ymax),0) + 1
+
+        for i in range(dim):
+            label = tk.Label(slider_frame, text=f"Dim {i}:")
+            label.pack(pady=5)
+
+            # Create a slider for the current dimension
+            slider_var = tk.DoubleVar(value=0.0)  # Default value for the slider
+            self.slider_vars.append(slider_var)
+            # Store the slider and its variable
+
+            slider = tk.Scale(
+                slider_frame,
+                from_=from_value,  # Minimum value for the latent space dimension
+                to=to_value,      # Maximum value for the latent space dimension
+                resolution=0.1,  # Step size for the slider
+                orient=tk.HORIZONTAL,
+                variable=slider_var,
+                length=200,
+                command=lambda value, idx=i: self._on_slider_change(idx, float(value)), 
+            )
+            slider.pack(pady=5)
+            self.sliders.append(slider)
+
+
+        # Add a button to update the plots
+        update_button = tk.Button(slider_frame, text="Update Plots", command=self._update_latent_space_plots)
+        update_button.pack(pady=10)
+
+        # Create a frame for the plots
+        plot_frame = tk.Frame(mapping_window_all)
+        plot_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        # Create the matplotlib figure and canvas
+        self.fig_mapping_all, self.ax_mapping_all = plt.subplots(dim, dim, figsize=(12, 12))
+        self.canvas_mapping_all = FigureCanvasTkAgg(self.fig_mapping_all, master=plot_frame)
+        self.canvas_mapping_all.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # Draw the initial plots
+        self._update_latent_space_plots()
+        
+    def _on_slider_change(self, index, value):
+        """
+        Callback function triggered when a slider is moved.
+        """
+        # Update the slider variable
+        self.slider_vars[index].set(float(value))
+
+    def _predict_gain(self, dataset):
+        n = self._N.get()  # Get the resolution for the mapping
+        value_entry = self.gain_entry.get()
+        dataset_batched = tf.data.Dataset.from_tensor_slices(dataset).batch(256)
+        values = self.decoder.predict(dataset_batched, verbose=0)[:,-1] * self.vae_norm
+        values = values.reshape((n, n))
+        values = self.gain_norm[value_entry] * (values)
+        return (values)
+        
+
+    def _update_latent_space_plots(self):
+        """
+        Update the pairwise latent space plots based on the current slider values.
+        """
+        dim = self._get_dim()  # Get the dimensionality of the latent space
+
+        # Get the current slider values
+        fixed_values = [float(str(var.get())) for var in self.slider_vars]        
+        # Clear the existing plots
+        for i in range(dim):
+            for j in range(dim):
+                self.ax_mapping_all[i, j].clear()
+
+        # Generate the pairwise plots
+        for j in range(dim):
+            for i in range(dim):
+                if i < j:
+                    mesh, latent_points = self._plot_mapping(i,j)
+
+                    # Set the fixed values for the other dimensions
+                    for k in range(dim):
+                        if k != i and k != j:
+                            latent_points[:, k] = fixed_values[k]
+
+                    # Predict the gain values
+                    values = self._predict_gain(latent_points)
+
+                    # Plot the values
+                    im = self.ax_mapping_all[j, i].pcolormesh(mesh[0], mesh[1], values, cmap='viridis')
+                    self.ax_mapping_all[j, i].set_xlabel(f'Dim {i}')
+                    self.ax_mapping_all[j, i].set_ylabel(f'Dim {j}')
+                    # Update or create the colorbar
+                else:
+                    # Hide the plots for i >= j
+                    self.ax_mapping_all[j, i].axis("off")
+                    
+        if hasattr(self, 'ax_mapping_all_cbar'):
+            self.ax_mapping_all_cbar.update_normal(im)  # Update the existing colorbar
+        else:
+            self.ax_mapping_all_cbar = plt.colorbar(im, ax=self.ax_mapping_all.ravel().tolist())  # Create a new colorbar
+
+        # Redraw the canvas
+        self.canvas_mapping_all.draw()
     
 class PostProcessingFCI2D(PostprocessingFCI):
     def __init__(self, root, data_loader: DataLoader):

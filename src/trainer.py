@@ -196,8 +196,7 @@ class TrainerFCI(Trainer):
         else:
             results_path = Path(results_dir)
             results_path.mkdir(parents=True, exist_ok=True)
-            folder_name = f"std_{name}_{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}"
-            res_folder = results_path / folder_name
+            res_folder = self.res_folder
             z = np.loadtxt(res_folder / 'latent_z.txt')
 
         _, gain = self.data_loader.get_x_y(var_name)
@@ -254,6 +253,42 @@ class TrainerMNIST(Trainer):
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
         _, encoder, _ = models["vae"]
+        
+        # Saving latent space
+        batch_size = 256
+        dataset_batched, _ = self.data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
+        z = encoder.predict(dataset_batched)[-1]
+        np.savetxt(self.res_folder / 'latent_z.txt',z)
+        return history
+
+
+class TrainerGain(Trainer):
+    def __init__(self,model_selector : ModelSelector, data_loader : DataLoader, config):
+        super().__init__(model_selector, data_loader, config)
+        
+    def train(self):
+        self.train_vae()
+    
+    def train_vae(self):
+        config = self.config
+        kl_loss = config["kl_loss"]
+        latent_dim =  config["latent_dim"]
+        num_components = config["num_components"]
+        
+        dataset = self.data_loader.get_tf_dataset()
+
+        input_shape = self.data_loader.get_shape()
+            
+        # Get VAE model_selector
+        models = self.model_selector.get_model(
+            input_shape = input_shape,
+            latent_dim  = latent_dim,
+            num_components = num_components,
+            k_loss      = kl_loss
+        )
+        
+        history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
+        _, encoder, decoder = models["vae"]
         
         # Saving latent space
         batch_size = 256

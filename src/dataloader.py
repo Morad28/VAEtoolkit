@@ -246,6 +246,109 @@ class DataLoaderFCI(DataLoader):
         
         return(model)
 
+class DataLoaderGain(DataLoader):
+    """
+    Incorporates the gain in the data to predict the gain in the VAE model.
+    """
+        
+    def __init__(self, config, result_folder=None):
+        self._preprocessed = False
+        self.gain_norm = {}
+        self.vae_norm = 1.
+        super().__init__(config, result_folder)
+        
+    def preprocessing(self):
+        filter          = self.config.get("filter", None)
+        if filter is not None: self.apply_mask(filter)   
+        if not self._preprocessed:
+            self._normalize_data()
+            self._preprocessed = True
+        
+        
+    def get_x_y(self, values = 'gain'):
+        x = self.dataset['data']
+        y = self.dataset['values'][values]
+
+        return(x,y)
+        
+    def _normalize_data(self):
+        """Normalize data to be in the range [0, 1].
+        
+        Returns:
+            normalized_data: The normalized data.
+        """
+        # Normalize data to be in the range [-1, 1]
+        self.dataset['data'] = np.array(self.dataset['data'])
+        
+        self.dataset['data'] = self.dataset['data'] / self.vae_norm
+
+        
+    def apply_mask(self,filter):
+        key = list(filter.keys())[0]
+        gain_val = np.array(self.dataset['values'][key])
+        mask = gain_val >= filter[key]
+        
+        for key in self.dataset['values'].keys():
+            self.dataset['values'][key] = np.array(self.dataset['values'][key])[mask]
+            
+        self.dataset['data'] = np.array(self.dataset['data'])[mask]
+        self.dataset['name'] = np.array(self.dataset['name'])[mask]
+        
+        if self.dataset['data'].shape[0] == 0:
+            raise ValueError(f"No data left after applying filter. {gain_val} might be to high.")
+
+
+    def get_shape(self):
+        if len(self.dataset['data'].shape[1:]) == 1:
+            return (self.dataset['data'].shape[1], 1)
+        return self.dataset['data'].shape[1:]
+
+    def _load_data(self) -> dict:
+        """Load dataset from .npy file.
+        """
+
+        loaded_dataset = np.load(self.dataset_path, allow_pickle=True).item()
+        
+        loaded_dataset['data'] = np.array(loaded_dataset['data'])
+        loaded_dataset['values']['gain'] = np.array(loaded_dataset['values']['gain'])
+        
+        if len(loaded_dataset["data"].shape) == 2:
+            self.vae_norm  =  np.max(loaded_dataset["data"])
+        elif len(loaded_dataset["data"].shape) == 3:
+            self.vae_norm  =  np.max(loaded_dataset["data"], axis=(0, 1), keepdims=True)
+        
+        for key in loaded_dataset["values"]:
+            self.gain_norm[key] = np.max(loaded_dataset["values"][key])
+        
+        # incorporate the gain in the data
+        gain = loaded_dataset['values']['gain']
+        gain = np.expand_dims(gain, axis=-1)
+        loaded_dataset['data'] = np.concatenate((loaded_dataset['data'], gain), axis=-1)
+        
+        return(loaded_dataset)
+    
+    def _load_model(self) -> dict:
+        """Load model.
+        returns:
+            encoder (tf.keras.models): Encoder model.
+            decoder (tf.keras.models): Decoder model.
+            latent_space (np.array): Latent space.
+        """    
+        encoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-encoder.keras"),
+                                        custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+
+        decoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder.keras"),
+                                        custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+
+        latent_space = np.loadtxt(os.path.join(self.result_folder,"latent_z.txt"))
+        
+        model = {
+            "encoder": encoder, 
+            "decoder": decoder,
+            "latent_space": latent_space,
+        }
+        
+        return(model)
 
 class DataLoaderMNIST(DataLoader):
     def __init__(self, config, result_folder = None, take = -1):
