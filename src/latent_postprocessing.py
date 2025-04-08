@@ -963,11 +963,10 @@ class PostprocessingGain(PostprocessingBase):
 
     def _predict_gain(self, dataset):
         n = self._N.get()  # Get the resolution for the mapping
-        value_entry = self.gain_entry.get()
         dataset_batched = tf.data.Dataset.from_tensor_slices(dataset).batch(256)
         values = self.decoder.predict(dataset_batched, verbose=0)[:,-1] * self.vae_norm["std"] + self.vae_norm["mean"]
         values = values.reshape((n, n))
-        values = self.gain_norm[value_entry] * (values)
+        print("values",values)
         return (values)
         
 
