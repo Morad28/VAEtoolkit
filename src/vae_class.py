@@ -85,7 +85,7 @@ class VAE(keras.Model):
 
     version = '1.4'
 
-    def __init__(self, encoder=None, decoder=None, loss_weights=[1,1,1], **kwargs):
+    def __init__(self, encoder=None, decoder=None, loss_weights=[1,1,1], config=None, **kwargs):
         '''
         VAE instantiation with encoder, decoder and r_loss_factor
         args :
@@ -97,6 +97,7 @@ class VAE(keras.Model):
             None
         '''
         super(VAE, self).__init__(**kwargs)
+        self.config = config
         self.encoder      = encoder
         self.decoder      = decoder
         self.loss_weights = loss_weights
@@ -104,6 +105,7 @@ class VAE(keras.Model):
         self.reconstruction_loss_tracker = keras.metrics.Mean(
             name="r_loss"
         )
+        self.gain_loss_tracker = keras.metrics.Mean(name="gain_loss")
         self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
         
 
@@ -114,6 +116,7 @@ class VAE(keras.Model):
             self.total_loss_tracker,
             self.reconstruction_loss_tracker,
             self.kl_loss_tracker,
+            self.gain_loss_tracker,
         ]
        
     @tf.function
@@ -143,12 +146,13 @@ class VAE(keras.Model):
             kl_loss : KL loss
         '''
 
-        input = data    
+        input = data
         # ---- Get the input we need, specified in the .fit()
         #
         # if isinstance(input, tuple):
         #     input = input[0]
-            
+        
+        # r_loss, k_loss, gain_loss
         k1,k2,k3 = self.loss_weights
         
         # ---- Forward pass
@@ -156,6 +160,12 @@ class VAE(keras.Model):
         #      operations on the GradientTape.
         #
         input32              = tf.cast(input,dtype=tf.float32)
+        if self.config != None and self.config["Model"]["vae"] == "1D-COILS-GAIN" and self.config["sep_loss"]:
+            print("Separating gain and data loss")
+            # check the shape of input32
+            input_data = input32[:,:-1]
+            gain = input32[:,-1]
+
         with tf.GradientTape() as tape:
             
             # ---- Get encoder outputs
@@ -165,20 +175,39 @@ class VAE(keras.Model):
             # ---- Get reconstruction from decoder
             #
             reconstruction       = self.decoder(z)
+            if self.config != None and self.config["Model"]["vae"] == "1D-COILS-GAIN" and self.config["sep_loss"]:
+                reconstruction_data = reconstruction[:,:-1]
+                reconstruction_gain = reconstruction[:,-1]
          
-            # ---- Compute loss
-            #      Reconstruction loss, KL loss and Total loss
+                # ---- Compute loss
+                #      Reconstruction loss, KL loss and Total loss
 
-            # gain32        = tf.cast(gain,dtype=tf.float32)
-            # gain_constraint_loss = tf.reduce_mean(tf.square(z_mean[:, 0] - gain32))            
+                # gain32        = tf.cast(gain,dtype=tf.float32)
+                # gain_constraint_loss = tf.reduce_mean(tf.square(z_mean[:, 0] - gain32))
 
-            reconstruction_loss  = k1 * tf.reduce_mean(tf.square(input32 - reconstruction))
-            # reconstruction_loss  = k1 * tf.keras.losses.binary_crossentropy(input32,reconstruction)
+                len_input_data = tf.cast(tf.shape(input_data)[1], dtype=tf.float32)
+                len_gain = 1.
+                len_input32 = tf.cast(tf.shape(input32)[1], dtype=tf.float32)
+                # show the values of the tensors
+
+
+                reconstruction_loss_data  = k1 * tf.reduce_mean(tf.square(input_data - reconstruction_data)) * len_input_data / len_input32
+                reconstruction_loss_gain  = k3 * tf.reduce_mean(tf.square(gain - reconstruction_gain)) * len_gain / len_input32
+            
+                reconstruction_loss  = reconstruction_loss_data + reconstruction_loss_gain
+            else:
+                # ---- Compute loss
+                #      Reconstruction loss, KL loss and Total loss
+
+                # gain32        = tf.cast(gain,dtype=tf.float32)
+                # gain_constraint_loss = tf.reduce_mean(tf.square(z_mean[:, 0] - gain32))            
+
+                reconstruction_loss  = k1 * tf.reduce_mean(tf.square(input32 - reconstruction))
 
             kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
             kl_loss = -tf.reduce_mean(kl_loss) * k2
 
-            total_loss = reconstruction_loss + kl_loss # + gain_constraint_loss * k3 
+            total_loss = reconstruction_loss + kl_loss
 
         # ---- Retrieve gradients from gradient_tape
         #      and run one step of gradient descent
@@ -188,14 +217,24 @@ class VAE(keras.Model):
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)
-        self.reconstruction_loss_tracker.update_state(reconstruction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
-        return {
-            "loss":     self.total_loss_tracker.result(),
-            "r_loss":   self.reconstruction_loss_tracker.result(),
-            "kl_loss":  self.kl_loss_tracker.result()
-            # "gain_loss" : gain_constraint_loss,
-        }
+        if self.config != None and self.config["Model"]["vae"] == "1D-COILS-GAIN" and self.config["sep_loss"]:
+            self.gain_loss_tracker.update_state(reconstruction_loss_gain)
+            self.reconstruction_loss_tracker.update_state(reconstruction_loss_data)
+            return {
+                "loss":     self.total_loss_tracker.result(),
+                "r_loss":   self.reconstruction_loss_tracker.result(),
+                "kl_loss":  self.kl_loss_tracker.result(),
+                "gain_loss" : self.gain_loss_tracker.result()
+            }
+        else: 
+            self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+            return {
+                "loss":     self.total_loss_tracker.result(),
+                "r_loss":   self.reconstruction_loss_tracker.result(),
+                "kl_loss":  self.kl_loss_tracker.result()
+                # "gain_loss" : gain_constraint_loss,
+            }
     
     @tf.function
     def test_step(self,val_data):
@@ -210,7 +249,19 @@ class VAE(keras.Model):
         reconstruction       = self.decoder(z)
         input32              = tf.cast(input,dtype=tf.float32)
 
+        if self.config != None and self.config["Model"]["vae"] == "1D-COILS-GAIN" and self.config["sep_loss"]:
+            reconstruction_data = reconstruction[:,:-1]
+            reconstruction_gain = reconstruction[:,-1]
+            gain = input32[:,-1]
+            input_data = input32[:,:-1]
 
+            len_input_data = tf.cast(tf.shape(input_data)[1], dtype=tf.float32)
+            len_gain = 1.
+            len_input32 = tf.cast(tf.shape(input32)[1], dtype=tf.float32)
+            reconstruction_loss_data  = k1 * tf.reduce_mean(tf.square(input_data - reconstruction_data)) * len_input_data / len_input32
+            reconstruction_loss_gain  = k3 * tf.reduce_mean(tf.square(gain - reconstruction_gain)) * len_gain / len_input32
+        
+            reconstruction_loss  = reconstruction_loss_data + reconstruction_loss_gain
          
             # ---- Compute loss
             #      Reconstruction loss, KL loss and Total loss
@@ -218,7 +269,8 @@ class VAE(keras.Model):
         # gain32        = tf.cast(gain,dtype=tf.float32)
         # gain_constraint_loss = tf.reduce_mean(tf.square(z_mean[:, 0] - gain32))            
 
-        reconstruction_loss  = k1 * tf.reduce_mean(tf.square(input32 - reconstruction) )
+        else:
+            reconstruction_loss  = k1 * tf.reduce_mean(tf.square(input32 - reconstruction) )
         # reconstruction_loss  = k1 * tf.keras.losses.binary_crossentropy(input32,reconstruction)
 
         kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
@@ -226,14 +278,24 @@ class VAE(keras.Model):
 
         total_loss = reconstruction_loss + kl_loss #+ gain_constraint_loss * k3 
         self.total_loss_tracker.update_state(total_loss)
-        self.reconstruction_loss_tracker.update_state(reconstruction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
-        return {
-            "loss":     self.total_loss_tracker.result(),
-            "r_loss":   self.reconstruction_loss_tracker.result(),
-            "kl_loss":  self.kl_loss_tracker.result()
-            # "gain_loss" : gain_constraint_loss,
-        }
+        if self.config != None and self.config["Model"]["vae"] == "1D-COILS-GAIN" and self.config["sep_loss"]:
+            self.gain_loss_tracker.update_state(reconstruction_loss_gain)
+            self.reconstruction_loss_tracker.update_state(reconstruction_loss_data)
+            return {
+                "loss":     self.total_loss_tracker.result(),
+                "r_loss":   self.reconstruction_loss_tracker.result(),
+                "kl_loss":  self.kl_loss_tracker.result(),
+                "gain_loss" : self.gain_loss_tracker.result()
+            }
+        else:
+            self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+            return {
+                "loss":     self.total_loss_tracker.result(),
+                "r_loss":   self.reconstruction_loss_tracker.result(),
+                "kl_loss":  self.kl_loss_tracker.result()
+                # "gain_loss" : gain_constraint_loss,
+            }
     
     def predict(self,inputs):
         '''Our predict function...'''

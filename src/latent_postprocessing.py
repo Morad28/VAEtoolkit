@@ -664,7 +664,8 @@ class PostprocessingGain(PostprocessingBase):
             
         self.x_max = None
         self.gain_norm = self.data_loader.gain_norm
-        self.vae_norm = self.data_loader.vae_norm     
+        self.vae_norm = self.data_loader.vae_norm
+        self.gain_weight = self.data_loader.config["gain_weight"]
         
     def add_custom_buttons(self, parent):
         tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)
@@ -712,7 +713,7 @@ class PostprocessingGain(PostprocessingBase):
 
         prediction = self.decoder.predict(latent_point,verbose=0)[0]
         laser = prediction[:-1]
-        gain_val = prediction[-1] * self.vae_norm["std"] + self.vae_norm["mean"]
+        gain_val = prediction[-1] / self.gain_weight * self.vae_norm["std"] + self.vae_norm["mean"]
     
         self.ax_detail.plot(self.time, laser * self.vae_norm["std"] + self.vae_norm["mean"], label=f" {gain_entry}={gain_val}")
         self.ax_detail.set_title("Profiles")
@@ -726,7 +727,7 @@ class PostprocessingGain(PostprocessingBase):
         laser_decoded = self.decoder.predict(decoding_dataset,verbose=0)
         value_entry = self.gain_entry.get()
         
-        gain = laser_decoded[:,-1] * self.vae_norm["std"] + self.vae_norm["mean"]
+        gain = laser_decoded[:,-1] / self.gain_weight * self.vae_norm["std"] + self.vae_norm["mean"]
         laser_decoded = laser_decoded[:,:-1]
         
         folder = self.data_loader.result_folder + f"/{name}"
@@ -773,7 +774,7 @@ class PostprocessingGain(PostprocessingBase):
             pca_random_samples = (random_samples)
             random_samples = self._pca.inverse_transform(pca_random_samples)
         
-        predictions = self.decoder.predict(random_samples, verbose=0)[:,-1] * self.vae_norm["std"] + self.vae_norm["mean"]
+        predictions = self.decoder.predict(random_samples, verbose=0)[:,-1] / self.gain_weight * self.vae_norm["std"] + self.vae_norm["mean"]
         
         # Find the maximum
         max_index = np.argmax(predictions)
@@ -964,9 +965,8 @@ class PostprocessingGain(PostprocessingBase):
     def _predict_gain(self, dataset):
         n = self._N.get()  # Get the resolution for the mapping
         dataset_batched = tf.data.Dataset.from_tensor_slices(dataset).batch(256)
-        values = self.decoder.predict(dataset_batched, verbose=0)[:,-1] * self.vae_norm["std"] + self.vae_norm["mean"]
+        values = self.decoder.predict(dataset_batched, verbose=0)[:,-1] / self.gain_weight * self.vae_norm["std"] + self.vae_norm["mean"]
         values = values.reshape((n, n))
-        print("values",values)
         return (values)
         
 

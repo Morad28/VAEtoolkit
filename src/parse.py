@@ -38,6 +38,14 @@ def parse_args():
     )
 
     parser.add_argument(
+        '--sep_loss',
+        type=bool,
+        choices=[True, False],
+        default=False,
+        help='Separate loss for gain and data in vae'
+    )
+
+    parser.add_argument(
         '--epoch_vae',
         type=int,
         default=100,
@@ -84,6 +92,20 @@ def parse_args():
         type=float,
         default=1e-5,
         help='kl_loss weight'
+    )
+
+    parser.add_argument(
+        '--gain_loss',
+        type=float,
+        default=1.,
+        help='Weight of the gain part of the loss when using a vae with gain'
+    )
+
+    parser.add_argument(
+        '--gain_weight',
+        type=float,
+        default=1.,
+        help='Weight of the gain part of the input when using a vae with gain'
     )
 
     parser.add_argument(

@@ -88,39 +88,51 @@ class Diagnostics():
 
         elif self.config["DataType"] == "1DFCI-GAIN":
             vae_norm = data_loader.vae_norm
-            predicted_gain = tilde_laser[:,-1] * vae_norm["std"] + vae_norm["mean"]
+            predicted_gain = tilde_laser[:,-1] / self.config["gain_weight"] * vae_norm["std"] + vae_norm["mean"]
             predicted_laser = tilde_laser[:,:-1] * vae_norm["std"] + vae_norm["mean"]
-            gain = data[:,-1] * vae_norm["std"] + vae_norm["mean"]
+            gain = data[:,-1] / self.config["gain_weight"] * vae_norm["std"] + vae_norm["mean"]
             laser = data[:,:-1] * vae_norm["std"] + vae_norm["mean"]
 
             error_gain = []
             for i in range(len(data)):
-                error_gain.append( np.max(np.abs(gain[i] - predicted_gain[i])) / np.max(np.abs(gain[i])) )
+                error_gain.append( np.abs(gain[i] - predicted_gain[i]) / np.abs(gain[i]))
             
             error_laser = []
             for i in range(len(data)):
-                error_laser.append( np.max(np.abs(laser[i] - predicted_laser[i])) / np.max(np.abs(laser[i])) )
+                error_laser.append( np.max(np.abs(laser[i] - predicted_laser[i]) / np.abs(laser[i])) )
             
             plt.figure()
             plt.hist(np.array(error_gain) * 100 ,bins=30)
-            plt.title("Erreur de reconstruction gain")
-            plt.savefig(self.res_folder / "hist_gain.png")
+            plt.title("Erreur de reconstruction du cutoff")
+            plt.savefig(self.res_folder / "hist_error_cutoff.png")
             plt.close()
 
             plt.figure()
             plt.hist(np.array(error_laser) * 100 ,bins=30)
-            plt.title("Erreur de reconstruction laser")
-            plt.savefig(self.res_folder / "hist_laser.png")
+            plt.title("Erreur de reconstruction du profil de pas")
+            plt.savefig(self.res_folder / "hist_error_pas.png")
             plt.close()
 
         else:
             error = []
             for i in range(len(data)):
-                error.append( np.max(np.abs(data[i] - tilde_laser[i])) / np.max(np.abs(data[i])) )
+                error.append( np.max(np.abs(data[i] - tilde_laser[i]) / np.abs(data[i])) )
             plt.figure()            
             plt.hist(np.array(error) * 100 ,bins=30)
-            plt.title("Erreur de reconstruction")
-            plt.savefig(self.res_folder / "hist_error.png")
+            plt.title("Erreur de reconstruction du laser")
+            plt.savefig(self.res_folder / "hist_error_laser.png")
+            plt.close()
+
+            predicted_gain = self.trainer.models["gain"].predict(z) * data_loader.gain_norm["gain"]
+            gain = label * data_loader.gain_norm["gain"]
+            gain_errors = []
+            for i in range(len(data)):
+                gain_errors.append( np.abs(gain[i] - predicted_gain[i]) / np.abs(gain[i]))
+            
+            plt.figure()
+            plt.hist(np.array(gain_errors) * 100 ,bins=30)
+            plt.title("Erreur de reconstruction du gain")
+            plt.savefig(self.res_folder / "hist_error_gain.png")
             plt.close()
         
 
@@ -211,6 +223,16 @@ class Diagnostics():
             plt.savefig(self.res_folder / "min_error_gain.png")
             plt.close()
 
+            plt.figure()
+            plt.hist(gain ,bins=30)
+            plt.title("Distribution des gains")
+            plt.xlabel("Gain")
+            plt.ylabel("Fréquence")
+            plt.yscale("log")
+            plt.savefig(self.res_folder / f"hist_gain.png")
+            plt.close()
+
+
 
         else:
             index_max = np.argmax(np.array(error))
@@ -229,6 +251,7 @@ class Diagnostics():
             plt.legend()
             plt.savefig(self.res_folder / "min_error.png")
             plt.close()
+
         
         training = self.config['training']
 

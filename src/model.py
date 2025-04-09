@@ -14,7 +14,7 @@ class ModelSelector:
         self.vae = kwargs.get('vae', None)
         self.gain = kwargs.get('gain', None)
         
-    def get_model(self,input_shape=(512,1), latent_dim=5, num_components=3, r_loss=1., k_loss=1., gain_loss=0.):
+    def get_model(self,input_shape=(512,1), latent_dim=5, num_components=3, r_loss=1., k_loss=1., gain_loss=0., config=None):
         s = {}
         if self.vae == '1D-FCI':
             s["vae"] = self._get_1d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
@@ -25,7 +25,7 @@ class ModelSelector:
         if self.vae == '1D-COILS':
             s["vae"] = self._get_1d_vae_coils(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
         if self.vae == '1D-COILS-GAIN':
-            s["vae"] = self._get_1d_vae_coils_gain(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
+            s["vae"] = self._get_1d_vae_coils_gain(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, config=config)
         if self.gain == '12MLP':
             s["mlp"] = self._get_gain_network_12_mlp(latent_dim)
         if not bool(s):
@@ -186,7 +186,7 @@ class ModelSelector:
         
         return autoencoder, encoder, decoder
     
-    def _get_1d_vae_coils_gain(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.):
+    def _get_1d_vae_coils_gain(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0., config=None):
         """For training on 1D coils 
 
         Args:
@@ -234,7 +234,7 @@ class ModelSelector:
         print(encoder.summary())
         print(decoder.summary())
 
-        autoencoder = VAE(encoder,decoder, [r_loss,k_loss,gain_loss])
+        autoencoder = VAE(encoder,decoder, [r_loss,k_loss,gain_loss], config=config)
 
         return autoencoder, encoder, decoder
 

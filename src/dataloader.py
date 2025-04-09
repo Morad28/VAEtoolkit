@@ -285,6 +285,10 @@ class DataLoaderGain(DataLoader):
         std = self.vae_norm["std"]
         self.dataset['data'] = (self.dataset['data'] - mean) / std
 
+        gain_weight = self.config["gain_weight"]
+        self.dataset['data'][:, -1] = self.dataset['data'][:, -1] * gain_weight
+
+
         
     def apply_mask(self,filter):
         key = list(filter.keys())[0]

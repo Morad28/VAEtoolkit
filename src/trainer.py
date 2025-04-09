@@ -45,6 +45,14 @@ class Trainer(ABC):
         folder_name = f"std_{name}_{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}_{model}"
         if model == "2D-MNIST-MoG":
             folder_name += f"_gaussians_{num_components}"
+        if model == "1D-COILS-GAIN":
+            gain_weight = self.config["gain_weight"]
+            folder_name += f"_gw_{gain_weight}"
+            if self.config["sep_loss"]:
+                gain_loss = self.config["gain_loss"]
+                folder_name += f"_gl_{gain_loss}"
+                r_loss = self.config["r_loss"]
+                folder_name += f"_rl_{r_loss}"
         folder_name += f"_epochs_{epoch_vae}"
         self.res_folder = results_path / folder_name
         os.makedirs(os.path.dirname(self.res_folder / 'conf.json'), exist_ok=True)
@@ -219,6 +227,7 @@ class TrainerFCI(Trainer):
         self.history[var_name] = history
         self.models[var_name] = latent_gain
 
+
         return history
     
     
@@ -272,8 +281,10 @@ class TrainerGain(Trainer):
     def train_vae(self):
         config = self.config
         kl_loss = config["kl_loss"]
+        gain_loss = config["gain_loss"]
         latent_dim =  config["latent_dim"]
         num_components = config["num_components"]
+        r_loss = config["r_loss"]
         
         dataset = self.data_loader.get_tf_dataset()
 
@@ -284,7 +295,10 @@ class TrainerGain(Trainer):
             input_shape = input_shape,
             latent_dim  = latent_dim,
             num_components = num_components,
-            k_loss      = kl_loss
+            k_loss      = kl_loss,
+            gain_loss   = gain_loss,
+            r_loss = r_loss,
+            config = config
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
