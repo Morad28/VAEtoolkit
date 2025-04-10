@@ -160,7 +160,7 @@ class VAE(keras.Model):
         #      operations on the GradientTape.
         #
         input32              = tf.cast(input,dtype=tf.float32)
-        if self.config != None and self.config["Model"]["vae"] == "1D-COILS-GAIN" and self.config["sep_loss"]:
+        if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
             print("Separating gain and data loss")
             # check the shape of input32
             input_data = input32[:,:-1]
@@ -175,7 +175,7 @@ class VAE(keras.Model):
             # ---- Get reconstruction from decoder
             #
             reconstruction       = self.decoder(z)
-            if self.config != None and self.config["Model"]["vae"] == "1D-COILS-GAIN" and self.config["sep_loss"]:
+            if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
                 reconstruction_data = reconstruction[:,:-1]
                 reconstruction_gain = reconstruction[:,-1]
          
@@ -218,7 +218,7 @@ class VAE(keras.Model):
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)
         self.kl_loss_tracker.update_state(kl_loss)
-        if self.config != None and self.config["Model"]["vae"] == "1D-COILS-GAIN" and self.config["sep_loss"]:
+        if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
             self.gain_loss_tracker.update_state(reconstruction_loss_gain)
             self.reconstruction_loss_tracker.update_state(reconstruction_loss_data)
             return {
@@ -249,7 +249,7 @@ class VAE(keras.Model):
         reconstruction       = self.decoder(z)
         input32              = tf.cast(input,dtype=tf.float32)
 
-        if self.config != None and self.config["Model"]["vae"] == "1D-COILS-GAIN" and self.config["sep_loss"]:
+        if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
             reconstruction_data = reconstruction[:,:-1]
             reconstruction_gain = reconstruction[:,-1]
             gain = input32[:,-1]
@@ -279,7 +279,7 @@ class VAE(keras.Model):
         total_loss = reconstruction_loss + kl_loss #+ gain_constraint_loss * k3 
         self.total_loss_tracker.update_state(total_loss)
         self.kl_loss_tracker.update_state(kl_loss)
-        if self.config != None and self.config["Model"]["vae"] == "1D-COILS-GAIN" and self.config["sep_loss"]:
+        if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
             self.gain_loss_tracker.update_state(reconstruction_loss_gain)
             self.reconstruction_loss_tracker.update_state(reconstruction_loss_data)
             return {
