@@ -5,7 +5,6 @@ from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTr
 from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG
 
 
-
 class ModelSelector:
     def __init__(self):
         self.model_name = None
@@ -14,7 +13,8 @@ class ModelSelector:
         self.vae = kwargs.get('vae', None)
         self.gain = kwargs.get('gain', None)
         
-    def get_model(self,input_shape=(512,1), latent_dim=5, num_components=3, r_loss=1., k_loss=1., gain_loss=0., config=None):
+    def get_model(self,input_shape=(512,1), latent_dim=5, num_components=3, r_loss=1., k_loss=1.,
+                   gain_loss=0., config=None, dataloader=None, physical_penalty_weight=1):
         s = {}
         if self.vae == '1D-FCI':
             s["vae"] = self._get_1d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
@@ -25,7 +25,9 @@ class ModelSelector:
         if self.vae == '1D-COILS':
             s["vae"] = self._get_1d_vae_coils(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
         if self.vae == '1D-COILS-GAIN':
-            s["vae"] = self._get_1d_vae_coils_gain(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, config=config)
+            s["vae"] = self._get_1d_vae_coils_gain(input_shape=input_shape, latent_dim=latent_dim,
+                                                   r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, config=config,
+                                                     dataloader=dataloader, physical_penalty_weight=physical_penalty_weight)
         if self.gain == '12MLP':
             s["mlp"] = self._get_gain_network_12_mlp(latent_dim)
         if not bool(s):
@@ -186,7 +188,8 @@ class ModelSelector:
         
         return autoencoder, encoder, decoder
     
-    def _get_1d_vae_coils_gain(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0., config=None):
+    def _get_1d_vae_coils_gain(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.,
+                                physical_penalty_weight=1, config=None, dataloader=None):
         """For training on 1D coils 
 
         Args:
@@ -233,8 +236,15 @@ class ModelSelector:
 
         print(encoder.summary())
         print(decoder.summary())
+        
+        std = dataloader.vae_norm["std"]
+        mean = dataloader.vae_norm["mean"]
 
-        autoencoder = VAE(encoder,decoder, [r_loss,k_loss,gain_loss], config=config)
+        minimum_value = config["min_value"] if config is not None else 0.3
+        # normalize to make it correspond to the data
+        minimum_value = minimum_value * std + mean
+
+        autoencoder = VAE(encoder,decoder, [r_loss,k_loss,gain_loss], config=config, min_value = minimum_value, physical_penalty_weight=physical_penalty_weight)
 
         return autoencoder, encoder, decoder
 

@@ -85,7 +85,7 @@ class VAE(keras.Model):
 
     version = '1.4'
 
-    def __init__(self, encoder=None, decoder=None, loss_weights=[1,1,1], config=None, **kwargs):
+    def __init__(self, encoder=None, decoder=None, loss_weights=[1,1,1], config=None, min_value=0.3, physical_penalty_weight=1., **kwargs):
         '''
         VAE instantiation with encoder, decoder and r_loss_factor
         args :
@@ -97,7 +97,9 @@ class VAE(keras.Model):
             None
         '''
         super(VAE, self).__init__(**kwargs)
+        self.physical_penalty_weight = physical_penalty_weight
         self.config = config
+        self.min_value = min_value
         self.encoder      = encoder
         self.decoder      = decoder
         self.loss_weights = loss_weights
@@ -107,6 +109,7 @@ class VAE(keras.Model):
         )
         self.gain_loss_tracker = keras.metrics.Mean(name="gain_loss")
         self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
+        self.physical_loss_tracker = keras.metrics.Mean(name="physical_penalty")
         
 
 
@@ -178,6 +181,16 @@ class VAE(keras.Model):
             if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
                 reconstruction_data = reconstruction[:,:-1]
                 reconstruction_gain = reconstruction[:,-1]
+
+                # add an additional penalty to the reconstructed data loss if the reconstructed data gets below the minimum value
+                # the penalty is calculated as the mean over the samples of the sum of the squared difference between the reconstructed
+                # data and the minimum value
+                min_value = self.min_value
+                penalty = reconstruction_data - min_value
+                penalty = tf.where(penalty < 0, penalty, 0)
+                penalty = tf.reduce_mean(penalty, axis=0)
+                penalty = tf.reduce_sum(tf.square(penalty))
+                penalty = penalty * self.physical_penalty_weight
          
                 # ---- Compute loss
                 #      Reconstruction loss, KL loss and Total loss
@@ -194,15 +207,35 @@ class VAE(keras.Model):
                 reconstruction_loss_data  = k1 * tf.reduce_mean(tf.square(input_data - reconstruction_data)) * len_input_data / len_input32
                 reconstruction_loss_gain  = k3 * tf.reduce_mean(tf.square(gain - reconstruction_gain)) * len_gain / len_input32
             
-                reconstruction_loss  = reconstruction_loss_data + reconstruction_loss_gain
+                reconstruction_loss  = reconstruction_loss_data + reconstruction_loss_gain + penalty
             else:
                 # ---- Compute loss
                 #      Reconstruction loss, KL loss and Total loss
 
                 # gain32        = tf.cast(gain,dtype=tf.float32)
-                # gain_constraint_loss = tf.reduce_mean(tf.square(z_mean[:, 0] - gain32))            
+                # gain_constraint_loss = tf.reduce_mean(tf.square(z_mean[:, 0] - gain32))
 
-                reconstruction_loss  = k1 * tf.reduce_mean(tf.square(input32 - reconstruction))
+                # add an additional penalty to the reconstructed data loss if the reconstructed data gets below the minimum value
+                # the penalty is calculated as the mean over the samples of the sum of the squared difference between the reconstructed
+                # data and the minimum value
+                if self.config != None and self.config["DataType"] == "1DFCI-GAIN":
+                    reconstruction_data = reconstruction[:,:-1]
+                    min_value = self.min_value
+                    penalty = reconstruction_data - min_value
+                    penalty = tf.where(penalty < 0, penalty, 0)
+                    penalty = tf.reduce_mean(penalty, axis=0)
+                    penalty = tf.reduce_sum(tf.square(penalty))
+                    penalty = penalty * self.physical_penalty_weight       
+                else:
+                    min_value = self.min_value
+                    penalty = reconstruction - min_value
+                    penalty = tf.where(penalty < 0, penalty, 0)
+                    penalty = tf.reduce_mean(penalty, axis=0)
+                    penalty = tf.reduce_sum(tf.square(penalty))
+                    penalty = penalty * self.physical_penalty_weight     
+
+                reconstruction_loss_r  = k1 * tf.reduce_mean(tf.square(input32 - reconstruction))
+                reconstruction_loss  = reconstruction_loss_r + penalty
 
             kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
             kl_loss = -tf.reduce_mean(kl_loss) * k2
@@ -218,6 +251,7 @@ class VAE(keras.Model):
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)
         self.kl_loss_tracker.update_state(kl_loss)
+        self.physical_loss_tracker.update_state(penalty)
         if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
             self.gain_loss_tracker.update_state(reconstruction_loss_gain)
             self.reconstruction_loss_tracker.update_state(reconstruction_loss_data)
@@ -225,15 +259,16 @@ class VAE(keras.Model):
                 "loss":     self.total_loss_tracker.result(),
                 "r_loss":   self.reconstruction_loss_tracker.result(),
                 "kl_loss":  self.kl_loss_tracker.result(),
-                "gain_loss" : self.gain_loss_tracker.result()
+                "gain_loss" : self.gain_loss_tracker.result(),
+                "physical_penalty" : self.physical_loss_tracker.result()
             }
         else: 
-            self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+            self.reconstruction_loss_tracker.update_state(reconstruction_loss_r)
             return {
                 "loss":     self.total_loss_tracker.result(),
                 "r_loss":   self.reconstruction_loss_tracker.result(),
-                "kl_loss":  self.kl_loss_tracker.result()
-                # "gain_loss" : gain_constraint_loss,
+                "kl_loss":  self.kl_loss_tracker.result(),
+                "physical_penalty" : self.physical_loss_tracker.result()
             }
     
     @tf.function
@@ -255,13 +290,23 @@ class VAE(keras.Model):
             gain = input32[:,-1]
             input_data = input32[:,:-1]
 
+            # add an additional penalty to the reconstructed data loss if the reconstructed data gets below the minimum value
+            # the penalty is calculated as the mean over the samples of the sum of the squared difference between the reconstructed
+            # data and the minimum value
+            min_value = self.min_value
+            penalty = reconstruction_data - min_value
+            penalty = tf.where(penalty < 0, penalty, 0)
+            penalty = tf.reduce_mean(penalty, axis=0)
+            penalty = tf.reduce_sum(tf.square(penalty))
+            penalty = penalty * self.physical_penalty_weight
+
             len_input_data = tf.cast(tf.shape(input_data)[1], dtype=tf.float32)
             len_gain = 1.
             len_input32 = tf.cast(tf.shape(input32)[1], dtype=tf.float32)
             reconstruction_loss_data  = k1 * tf.reduce_mean(tf.square(input_data - reconstruction_data)) * len_input_data / len_input32
             reconstruction_loss_gain  = k3 * tf.reduce_mean(tf.square(gain - reconstruction_gain)) * len_gain / len_input32
         
-            reconstruction_loss  = reconstruction_loss_data + reconstruction_loss_gain
+            reconstruction_loss  = reconstruction_loss_data + reconstruction_loss_gain + penalty
          
             # ---- Compute loss
             #      Reconstruction loss, KL loss and Total loss
@@ -270,8 +315,27 @@ class VAE(keras.Model):
         # gain_constraint_loss = tf.reduce_mean(tf.square(z_mean[:, 0] - gain32))            
 
         else:
-            reconstruction_loss  = k1 * tf.reduce_mean(tf.square(input32 - reconstruction) )
-        # reconstruction_loss  = k1 * tf.keras.losses.binary_crossentropy(input32,reconstruction)
+            # add an additional penalty to the reconstructed data loss if the reconstructed data gets below the minimum value
+            # the penalty is calculated as the mean over the samples of the sum of the squared difference between the reconstructed
+            # data and the minimum value
+            if self.config != None and self.config["DataType"] == "1DFCI-GAIN":
+                reconstruction_data = reconstruction[:,:-1]
+                min_value = self.min_value
+                penalty = reconstruction_data - min_value
+                penalty = tf.where(penalty < 0, penalty, 0)
+                penalty = tf.reduce_mean(penalty, axis=0)
+                penalty = tf.reduce_sum(tf.square(penalty))
+                penalty = penalty * self.physical_penalty_weight
+            else:
+                min_value = self.min_value
+                penalty = reconstruction - min_value
+                penalty = tf.where(penalty < 0, penalty, 0)
+                penalty = tf.reduce_mean(penalty, axis=0)
+                penalty = tf.reduce_sum(tf.square(penalty))
+                penalty = penalty * self.physical_penalty_weight
+
+            reconstruction_loss_r  = k1 * tf.reduce_mean(tf.square(input32 - reconstruction) )
+            reconstruction_loss  = reconstruction_loss_r + penalty
 
         kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
         kl_loss = -tf.reduce_mean(kl_loss) * k2
@@ -279,6 +343,7 @@ class VAE(keras.Model):
         total_loss = reconstruction_loss + kl_loss #+ gain_constraint_loss * k3 
         self.total_loss_tracker.update_state(total_loss)
         self.kl_loss_tracker.update_state(kl_loss)
+        self.physical_loss_tracker.update_state(penalty)
         if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
             self.gain_loss_tracker.update_state(reconstruction_loss_gain)
             self.reconstruction_loss_tracker.update_state(reconstruction_loss_data)
@@ -286,15 +351,16 @@ class VAE(keras.Model):
                 "loss":     self.total_loss_tracker.result(),
                 "r_loss":   self.reconstruction_loss_tracker.result(),
                 "kl_loss":  self.kl_loss_tracker.result(),
-                "gain_loss" : self.gain_loss_tracker.result()
+                "gain_loss" : self.gain_loss_tracker.result(),
+                "physical_penalty" : self.physical_loss_tracker.result()
             }
         else:
-            self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+            self.reconstruction_loss_tracker.update_state(reconstruction_loss_r)
             return {
                 "loss":     self.total_loss_tracker.result(),
                 "r_loss":   self.reconstruction_loss_tracker.result(),
-                "kl_loss":  self.kl_loss_tracker.result()
-                # "gain_loss" : gain_constraint_loss,
+                "kl_loss":  self.kl_loss_tracker.result(),
+                "physical_penalty" : self.physical_loss_tracker.result()
             }
     
     def predict(self,inputs):

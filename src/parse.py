@@ -88,6 +88,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        '--min_value',
+        type=float,
+        default=0.3,
+        help='Minimum value for profile (physically acceptable)'
+    )
+
+    parser.add_argument(
         '--kl_loss',
         type=float,
         default=1e-5,
@@ -99,6 +106,13 @@ def parse_args():
         type=float,
         default=1.,
         help='Weight of the gain part of the loss when using a vae with gain'
+    )
+
+    parser.add_argument(
+        '--physical_penalty_weight',
+        type=float,
+        default=1.,
+        help='Weight of the physical penalty in the loss function'
     )
 
     parser.add_argument(

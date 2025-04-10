@@ -40,6 +40,7 @@ class Trainer(ABC):
         num_components = self.config["num_components"]
         batch_size_vae = self.config["batch_size_vae"]
         model = self.config["Model"]["vae"]
+        physical_penalty_weight = self.config["physical_penalty_weight"]
         results_path = Path(results_dir)
         results_path.mkdir(parents=True, exist_ok=True)
         folder_name = f"std_{name}_{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}_{model}"
@@ -53,6 +54,7 @@ class Trainer(ABC):
                 folder_name += f"_gl_{gain_loss}"
                 r_loss = self.config["r_loss"]
                 folder_name += f"_rl_{r_loss}"
+        folder_name += f"_phys_{physical_penalty_weight}"
         folder_name += f"_epochs_{epoch_vae}"
         self.res_folder = results_path / folder_name
         os.makedirs(os.path.dirname(self.res_folder / 'conf.json'), exist_ok=True)
@@ -257,7 +259,7 @@ class TrainerMNIST(Trainer):
             latent_dim  = latent_dim,
             num_components = num_components,
             k_loss      = kl_loss,
-            r_loss      = r_loss
+            r_loss      = r_loss,
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
@@ -285,6 +287,7 @@ class TrainerGain(Trainer):
         latent_dim =  config["latent_dim"]
         num_components = config["num_components"]
         r_loss = config["r_loss"]
+        physical_penalty_weight = config["physical_penalty_weight"]
         
         dataset = self.data_loader.get_tf_dataset()
 
@@ -298,7 +301,9 @@ class TrainerGain(Trainer):
             k_loss      = kl_loss,
             gain_loss   = gain_loss,
             r_loss = r_loss,
-            config = config
+            config = config,
+            dataloader = self.data_loader,
+            physical_penalty_weight = physical_penalty_weight,
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
