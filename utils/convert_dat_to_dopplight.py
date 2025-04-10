@@ -1,7 +1,7 @@
 import numpy as np
 
-data_path = "./testing_coils\std_dyn-shell_41_latent_5_kl_1e-05_256_1D-COILS-GAIN_gw_0.01_epochs_1000\laser_shot_g58_14.dat"
-save_path = "./pitch_profiles/pitch_g_58_14.txt"
+data_path = "./testing_coils\std_dyn-shell_41_latent_5_kl_0.001_256_1D-COILS-GAIN_gw_0.1_epochs_1000\laser_shot_g42_49.dat"
+save_path = "./pitch_profiles/pitch_g_42_49.txt"
 
 # load the data from the .dat file
 data = np.loadtxt(data_path, skiprows=1)

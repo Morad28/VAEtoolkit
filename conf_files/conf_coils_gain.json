@@ -13,10 +13,10 @@
     "latent_dim": 5,
     "batch_size_vae": 256,
     "batch_size_rna": 128,
-    "kl_loss": 1e-5,
+    "kl_loss": 1e-2,
     "r_loss" : 1,
     "gain_loss" : 1,
-    "gain_weight" : 10,
+    "gain_weight" : 1e-1,
     "training" : [],
     "num_components" : 5,
     "reprise" : {
