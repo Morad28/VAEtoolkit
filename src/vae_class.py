@@ -187,7 +187,7 @@ class VAE(keras.Model):
                 # data and the minimum value
                 min_value = self.min_value
                 penalty = reconstruction_data - min_value
-                penalty = tf.where(penalty < 0, penalty, 0)
+                penalty = tf.where(penalty > 0, penalty, 0)
                 penalty = tf.reduce_mean(penalty, axis=0)
                 penalty = tf.reduce_sum(tf.square(penalty))
                 penalty = penalty * self.physical_penalty_weight
@@ -222,14 +222,14 @@ class VAE(keras.Model):
                     reconstruction_data = reconstruction[:,:-1]
                     min_value = self.min_value
                     penalty = reconstruction_data - min_value
-                    penalty = tf.where(penalty < 0, penalty, 0)
+                    penalty = tf.where(penalty > 0, penalty, 0)
                     penalty = tf.reduce_mean(penalty, axis=0)
                     penalty = tf.reduce_sum(tf.square(penalty))
                     penalty = penalty * self.physical_penalty_weight       
                 else:
                     min_value = self.min_value
                     penalty = reconstruction - min_value
-                    penalty = tf.where(penalty < 0, penalty, 0)
+                    penalty = tf.where(penalty > 0, penalty, 0)
                     penalty = tf.reduce_mean(penalty, axis=0)
                     penalty = tf.reduce_sum(tf.square(penalty))
                     penalty = penalty * self.physical_penalty_weight     
@@ -295,7 +295,7 @@ class VAE(keras.Model):
             # data and the minimum value
             min_value = self.min_value
             penalty = reconstruction_data - min_value
-            penalty = tf.where(penalty < 0, penalty, 0)
+            penalty = tf.where(penalty > 0, penalty, 0)
             penalty = tf.reduce_mean(penalty, axis=0)
             penalty = tf.reduce_sum(tf.square(penalty))
             penalty = penalty * self.physical_penalty_weight
@@ -322,14 +322,14 @@ class VAE(keras.Model):
                 reconstruction_data = reconstruction[:,:-1]
                 min_value = self.min_value
                 penalty = reconstruction_data - min_value
-                penalty = tf.where(penalty < 0, penalty, 0)
+                penalty = tf.where(penalty > 0, penalty, 0)
                 penalty = tf.reduce_mean(penalty, axis=0)
                 penalty = tf.reduce_sum(tf.square(penalty))
                 penalty = penalty * self.physical_penalty_weight
             else:
                 min_value = self.min_value
                 penalty = reconstruction - min_value
-                penalty = tf.where(penalty < 0, penalty, 0)
+                penalty = tf.where(penalty > 0, penalty, 0)
                 penalty = tf.reduce_mean(penalty, axis=0)
                 penalty = tf.reduce_sum(tf.square(penalty))
                 penalty = penalty * self.physical_penalty_weight
