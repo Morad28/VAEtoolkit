@@ -283,8 +283,10 @@ class DataLoaderGain(DataLoader):
         # Z-scoring normalization
         mean = self.vae_norm["mean"]
         std = self.vae_norm["std"]
-        self.dataset['data'] = (self.dataset['data'] - mean) / std
-
+        mean_gain = self.vae_norm["mean_gain"]
+        std_gain = self.vae_norm["std_gain"]
+        self.dataset['data'][:,:-1] = (self.dataset['data'][:,:-1] - mean) / std
+        self.dataset['data'][:,-1] = (self.dataset['data'][:,-1] - mean_gain) / std_gain
         gain_weight = self.config["gain_weight"]
         self.dataset['data'][:, -1] = self.dataset['data'][:, -1] * gain_weight
 
@@ -300,6 +302,9 @@ class DataLoaderGain(DataLoader):
             
         self.dataset['data'] = np.array(self.dataset['data'])[mask]
         self.dataset['name'] = np.array(self.dataset['name'])[mask]
+
+        print("Numbers of samples that will get filtered out: ", len(self.dataset['data']) - len(mask[mask == True]))
+        print("Numbers of samples that will be used: ", len(mask[mask == True]))
         
         if self.dataset['data'].shape[0] == 0:
             raise ValueError(f"No data left after applying filter. {gain_val} might be to high.")
@@ -321,7 +326,9 @@ class DataLoaderGain(DataLoader):
         
         std = np.std(loaded_dataset["data"])
         mean = np.mean(loaded_dataset["data"])
-        self.vae_norm = {"mean": mean, "std": std}
+        std_gain = np.std(loaded_dataset["values"]["gain"])
+        mean_gain = np.mean(loaded_dataset["values"]["gain"])
+        self.vae_norm = {"mean": mean, "std": std, "mean_gain": mean_gain, "std_gain": std_gain}
 
         for key in loaded_dataset["values"]:
             self.gain_norm[key] = np.max(loaded_dataset["values"][key])

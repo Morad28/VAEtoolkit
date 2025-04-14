@@ -162,6 +162,7 @@ class TrainerFCI(Trainer):
         config = self.config
         kl_loss = config["kl_loss"]
         latent_dim =  config["latent_dim"]
+        physical_penalty_weight = config["physical_penalty_weight"]
         
         dataset = self.data_loader.get_tf_dataset()
 
@@ -171,7 +172,8 @@ class TrainerFCI(Trainer):
         models = self.model_selector.get_model(
             input_shape = input_shape, 
             latent_dim  = latent_dim,
-            k_loss      = kl_loss
+            k_loss      = kl_loss,
+            physical_penalty_weight=physical_penalty_weight,
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)

@@ -88,9 +88,9 @@ class Diagnostics():
 
         elif self.config["DataType"] == "1DFCI-GAIN":
             vae_norm = data_loader.vae_norm
-            predicted_gain = tilde_laser[:,-1] / self.config["gain_weight"] * vae_norm["std"] + vae_norm["mean"]
+            predicted_gain = tilde_laser[:,-1] / self.config["gain_weight"] * vae_norm["std_gain"] + vae_norm["mean_gain"]
             predicted_laser = tilde_laser[:,:-1] * vae_norm["std"] + vae_norm["mean"]
-            gain = data[:,-1] / self.config["gain_weight"] * vae_norm["std"] + vae_norm["mean"]
+            gain = data[:,-1] / self.config["gain_weight"] * vae_norm["std_gain"] + vae_norm["mean_gain"]
             laser = data[:,:-1] * vae_norm["std"] + vae_norm["mean"]
 
             error_gain = []

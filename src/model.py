@@ -23,7 +23,7 @@ class ModelSelector:
         if self.vae == '2D-MNIST' or self.vae == '2D-MNIST-MoG':
             s["vae"] = self._get_2d_vae(input_shape=input_shape, latent_dim=latent_dim, num_components=num_components, r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
         if self.vae == '1D-COILS':
-            s["vae"] = self._get_1d_vae_coils(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
+            s["vae"] = self._get_1d_vae_coils(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, physical_penalty_weight=physical_penalty_weight)
         if self.vae == '1D-COILS-GAIN':
             s["vae"] = self._get_1d_vae_coils_gain(input_shape=input_shape, latent_dim=latent_dim,
                                                    r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, config=config,
@@ -139,7 +139,7 @@ class ModelSelector:
         
         return autoencoder, encoder, decoder
     
-    def _get_1d_vae_coils(self, input_shape=(40,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.):
+    def _get_1d_vae_coils(self, input_shape=(40,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0., physical_penalty_weight=1.):
         """For training on 1D coils 
 
         Args:
@@ -184,7 +184,7 @@ class ModelSelector:
         print(encoder.summary())
         print(decoder.summary())
 
-        autoencoder = VAE(encoder,decoder, [r_loss,k_loss,gain_loss])
+        autoencoder = VAE(encoder,decoder, [r_loss,k_loss,gain_loss], physical_penalty_weight=physical_penalty_weight)
         
         return autoencoder, encoder, decoder
     
