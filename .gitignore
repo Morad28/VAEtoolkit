@@ -10,4 +10,4 @@ __pycache__/
 testing/
 vaetools.egg-info/
 build/
-pitch_profiles/
+pitch_profiles/second_database/
