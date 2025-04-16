@@ -15,7 +15,7 @@
     "min_value": 0.2,
     "kl_loss": 1e-5,
     "training" : ["gain"],
-    "num_components" : 5,
+    "num_components" : 1,
     "physical_penalty_weight" : 0,
     "gain_weight" : 1,
     "reprise" : {
