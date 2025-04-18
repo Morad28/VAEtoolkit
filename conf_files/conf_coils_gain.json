@@ -19,6 +19,7 @@
     "physical_penalty_weight" : 0,
     "gain_weight" : 1,
     "training" : [],
+    "values" : ["gain"],
     "num_components" : 1,
     "reprise" : {
         "gain_only" : 0,

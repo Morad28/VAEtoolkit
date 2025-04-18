@@ -163,11 +163,12 @@ class VAE(keras.Model):
         #      operations on the GradientTape.
         #
         input32              = tf.cast(input,dtype=tf.float32)
-        if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
+        if self.config != None and (self.config["DataType"] == "1DFCI-GAIN" or self.config["DataType"]=="COILS-MULTI") and self.config["sep_loss"]:
             print("Separating gain and data loss")
             # check the shape of input32
-            input_data = input32[:,:-1]
-            gain = input32[:,-1]
+            len_values = len(self.config["values"])
+            input_data = input32[:,:-len_values]
+            gain = input32[:,-len_values:]
 
         with tf.GradientTape() as tape:
             
@@ -178,9 +179,10 @@ class VAE(keras.Model):
             # ---- Get reconstruction from decoder
             #
             reconstruction       = self.decoder(z)
-            if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
-                reconstruction_data = reconstruction[:,:-1]
-                reconstruction_gain = reconstruction[:,-1]
+            if self.config != None and (self.config["DataType"] == "1DFCI-GAIN" or self.config["DataType"]=="COILS-MULTI") and self.config["sep_loss"]:
+                len_values = len(self.config["values"])
+                reconstruction_data = reconstruction[:,:-len_values]
+                reconstruction_values = reconstruction[:,-len_values:]
 
                 # add an additional penalty to the reconstructed data loss if the reconstructed data gets below the minimum value
                 # the penalty is calculated as the mean over the samples of the sum of the squared difference between the reconstructed
@@ -199,13 +201,12 @@ class VAE(keras.Model):
                 # gain_constraint_loss = tf.reduce_mean(tf.square(z_mean[:, 0] - gain32))
 
                 len_input_data = tf.cast(tf.shape(input_data)[1], dtype=tf.float32)
-                len_gain = 1.
                 len_input32 = tf.cast(tf.shape(input32)[1], dtype=tf.float32)
                 # show the values of the tensors
 
 
                 reconstruction_loss_data  = k1 * tf.reduce_mean(tf.square(input_data - reconstruction_data)) * len_input_data / len_input32
-                reconstruction_loss_gain  = k3 * tf.reduce_mean(tf.square(gain - reconstruction_gain)) * len_gain / len_input32
+                reconstruction_loss_gain  = k3 * tf.reduce_mean(tf.square(gain - reconstruction_values)) * len_values / len_input32
             
                 reconstruction_loss  = reconstruction_loss_data + reconstruction_loss_gain + penalty
             else:
@@ -218,8 +219,9 @@ class VAE(keras.Model):
                 # add an additional penalty to the reconstructed data loss if the reconstructed data gets below the minimum value
                 # the penalty is calculated as the mean over the samples of the sum of the squared difference between the reconstructed
                 # data and the minimum value
-                if self.config != None and self.config["DataType"] == "1DFCI-GAIN":
-                    reconstruction_data = reconstruction[:,:-1]
+                if self.config != None and (self.config["DataType"] == "1DFCI-GAIN" or self.config["DataType"]=="COILS-MULTI"):
+                    len_values = len(self.config["values"])
+                    reconstruction_data = reconstruction[:,:-len_values]
                     min_value = self.min_value
                     penalty = reconstruction_data - min_value
                     penalty = tf.where(penalty > 0, penalty, 0)
@@ -252,7 +254,7 @@ class VAE(keras.Model):
         self.total_loss_tracker.update_state(total_loss)
         self.kl_loss_tracker.update_state(kl_loss)
         self.physical_loss_tracker.update_state(penalty)
-        if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
+        if self.config != None and (self.config["DataType"] == "1DFCI-GAIN" or self.config["DataType"]=="COILS-MULTI") and self.config["sep_loss"]:
             self.gain_loss_tracker.update_state(reconstruction_loss_gain)
             self.reconstruction_loss_tracker.update_state(reconstruction_loss_data)
             return {
@@ -284,11 +286,12 @@ class VAE(keras.Model):
         reconstruction       = self.decoder(z)
         input32              = tf.cast(input,dtype=tf.float32)
 
-        if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
-            reconstruction_data = reconstruction[:,:-1]
-            reconstruction_gain = reconstruction[:,-1]
-            gain = input32[:,-1]
-            input_data = input32[:,:-1]
+        if self.config != None and (self.config["DataType"] == "1DFCI-GAIN" or self.config["DataType"]=="COILS-MULTI") and self.config["sep_loss"]:
+            len_values = len(self.config["values"])
+            reconstruction_data = reconstruction[:,:-len_values]
+            reconstruction_gain = reconstruction[:,-len_values:]
+            gain = input32[:,-len_values:]
+            input_data = input32[:,:-len_values]
 
             # add an additional penalty to the reconstructed data loss if the reconstructed data gets below the minimum value
             # the penalty is calculated as the mean over the samples of the sum of the squared difference between the reconstructed
@@ -301,10 +304,9 @@ class VAE(keras.Model):
             penalty = penalty * self.physical_penalty_weight
 
             len_input_data = tf.cast(tf.shape(input_data)[1], dtype=tf.float32)
-            len_gain = 1.
             len_input32 = tf.cast(tf.shape(input32)[1], dtype=tf.float32)
             reconstruction_loss_data  = k1 * tf.reduce_mean(tf.square(input_data - reconstruction_data)) * len_input_data / len_input32
-            reconstruction_loss_gain  = k3 * tf.reduce_mean(tf.square(gain - reconstruction_gain)) * len_gain / len_input32
+            reconstruction_loss_gain  = k3 * tf.reduce_mean(tf.square(gain - reconstruction_gain)) * len_values / len_input32
         
             reconstruction_loss  = reconstruction_loss_data + reconstruction_loss_gain + penalty
          
@@ -318,8 +320,9 @@ class VAE(keras.Model):
             # add an additional penalty to the reconstructed data loss if the reconstructed data gets below the minimum value
             # the penalty is calculated as the mean over the samples of the sum of the squared difference between the reconstructed
             # data and the minimum value
-            if self.config != None and self.config["DataType"] == "1DFCI-GAIN":
-                reconstruction_data = reconstruction[:,:-1]
+            if self.config != None and (self.config["DataType"] == "1DFCI-GAIN" or self.config["DataType"]=="COILS-MULTI"):
+                len_values = len(self.config["values"])
+                reconstruction_data = reconstruction[:,:-len_values]
                 min_value = self.min_value
                 penalty = reconstruction_data - min_value
                 penalty = tf.where(penalty > 0, penalty, 0)
@@ -344,7 +347,7 @@ class VAE(keras.Model):
         self.total_loss_tracker.update_state(total_loss)
         self.kl_loss_tracker.update_state(kl_loss)
         self.physical_loss_tracker.update_state(penalty)
-        if self.config != None and self.config["DataType"] == "1DFCI-GAIN" and self.config["sep_loss"]:
+        if self.config != None and (self.config["DataType"] == "1DFCI-GAIN" or self.config["DataType"]=="COILS-MULTI") and self.config["sep_loss"]:
             self.gain_loss_tracker.update_state(reconstruction_loss_gain)
             self.reconstruction_loss_tracker.update_state(reconstruction_loss_data)
             return {
