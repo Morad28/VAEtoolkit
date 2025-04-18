@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow import keras
 from keras import layers, losses, Model
-from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTranspose, MaxPooling2D, Flatten, Reshape, MaxPooling1D, UpSampling1D
+from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTranspose, MaxPooling2D, Flatten, Reshape, MaxPooling1D, UpSampling1D, Concatenate
 from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG
 
 
@@ -27,6 +27,14 @@ class ModelSelector:
         if self.vae == '1D-COILS-GAIN':
             s["vae"] = self._get_1d_vae_coils_gain(input_shape=input_shape, latent_dim=latent_dim,
                                                    r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, config=config,
+                                                     dataloader=dataloader, physical_penalty_weight=physical_penalty_weight)
+        if self.vae == 'COILS-MULTI':
+            s["vae"] = self._get_1d_vae_coils_gain_multi(input_shape=input_shape, latent_dim=latent_dim,
+                                                       r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, config=config,
+                                                     dataloader=dataloader, physical_penalty_weight=physical_penalty_weight)
+        if self.vae == 'COILS-MULTI-OUT':
+            s["vae"] = self._get_1d_vae_coils_gain_multi_out(input_shape=input_shape, latent_dim=latent_dim,
+                                                       r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, config=config,
                                                      dataloader=dataloader, physical_penalty_weight=physical_penalty_weight)
         if self.gain == '12MLP':
             s["mlp"] = self._get_gain_network_12_mlp(latent_dim)
@@ -190,7 +198,8 @@ class ModelSelector:
     
     def _get_1d_vae_coils_gain(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.,
                                 physical_penalty_weight=1, config=None, dataloader=None):
-        """For training on 1D coils 
+        """For training on 1D coils with gain integrated in the VAE
+        Obsolete, use _get_1d_vae_coils_gain_multi instead (with only "cutoff" values to replicate the behaviour of this model)
 
         Args:
             input_shape (int, optional): _description_. Defaults to 41.
@@ -382,4 +391,138 @@ class ModelSelector:
         decoded = Dense(output_shape)(x)
             
         model = tf.keras.Model(inputs,  decoded, name='12MLP')
-        return(model) 
+        return(model)
+
+    def _get_1d_vae_coils_gain_multi(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.,
+                                physical_penalty_weight=1, config=None, dataloader=None):
+        """For training on 1D coils with multiple values
+
+        Args:
+            input_shape (int, optional): _description_. Defaults to 41.
+            latent_dim (int, optional): _description_. Defaults to 5.
+            r_loss (_type_, optional): _description_. Defaults to 0..
+            k_loss (_type_, optional): _description_. Defaults to 1..
+            gain_loss (_type_, optional): _description_. Defaults to 0..
+
+        Returns:
+            Model: autoencoder
+        """
+        inputs = Input(shape=input_shape)
+
+        out_shape = input_shape[0]
+        
+        # Encoder
+        x = Conv1D(32, 3, activation='leaky_relu', padding='same', strides=1)(inputs)
+        x = MaxPooling1D(pool_size=2)(x)  # Output: (20, 32)
+        x = Conv1D(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = MaxPooling1D(pool_size=2)(x)  # Output: (10, 64)
+        x = Conv1D(128, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = Flatten()(x)  # Output: (1280,)
+
+        x = Dense(128, activation='leaky_relu')(x)  # Add a dense layer before the latent space
+
+        z_mean = layers.Dense(latent_dim, name="z_mean")(x)
+        z_log_var = layers.Dense(latent_dim, name="z_log_var")(x)
+        z = Sampling()([z_mean, z_log_var])
+        encoder = keras.Model(inputs, [z_mean, z_log_var, z], name="encoder")
+        encoder.compile()
+
+        # Decoder
+        latent_inputs = Input(shape=(latent_dim,))
+        x = Dense(11 * 128, activation='leaky_relu')(latent_inputs)  # Match flattened size
+        x = Reshape((11, 128))(x)  # Output: (11, 128)
+        x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = UpSampling1D(size=2)(x)  # Output: (22, 64)
+        x = Conv1DTranspose(32, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = UpSampling1D(size=2)(x)  # Output: (44, 32)
+        x = Conv1DTranspose(1, 3, activation='linear', padding='same', strides=1)(x)  # Output: (44, 1)
+        decoded = x[:, :out_shape, :]  # Slice to ensure the output shape is (out_shape, 1)
+        decoded = Reshape((out_shape,))(decoded)
+        decoder = tf.keras.Model(latent_inputs, decoded, name='decoder')
+        decoder.compile()
+
+        print(encoder.summary())
+        print(decoder.summary())
+        
+        std = dataloader.vae_norm["profile"]["std"]
+        mean = dataloader.vae_norm["profile"]["mean"]
+
+        minimum_value = config["min_value"] if config is not None else 0.
+        # normalize to make it correspond to the data
+        minimum_value = minimum_value * std + mean
+
+        autoencoder = VAE(encoder,decoder, [r_loss,k_loss,gain_loss], config=config, min_value = minimum_value, physical_penalty_weight=physical_penalty_weight)
+
+        return autoencoder, encoder, decoder
+
+    def _get_1d_vae_coils_gain_multi_out(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.,
+                                physical_penalty_weight=1, config=None, dataloader=None):
+        """For training on 1D coils with multiple values with the values in the VAE, but not using the CNN layers
+
+        Args:
+            input_shape (int, optional): _description_. Defaults to 41.
+            latent_dim (int, optional): _description_. Defaults to 5.
+            r_loss (_type_, optional): _description_. Defaults to 0..
+            k_loss (_type_, optional): _description_. Defaults to 1..
+            gain_loss (_type_, optional): _description_. Defaults to 0..
+
+        Returns:
+            Model: autoencoder
+        """
+        inputs = Input(shape=input_shape)
+        len_values = len(config["values"])
+
+        profile = inputs[:,:-len_values,:]
+        vals = inputs[:,-len_values:,:]
+        vals = Flatten()(vals)
+
+        out_shape = input_shape[0]
+        
+        # Encoder
+        x = Conv1D(32, 3, activation='leaky_relu', padding='same', strides=1)(profile)
+        x = MaxPooling1D(pool_size=2)(x)  # Output: (20, 32)
+        x = Conv1D(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = MaxPooling1D(pool_size=2)(x)  # Output: (10, 64)
+        x = Conv1D(128, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = Flatten()(x)  # Output: (1280,)
+        x = Concatenate()([x,vals])
+
+        x = Dense(128, activation='leaky_relu')(x)  # Add a dense layer before the latent space
+
+        z_mean = layers.Dense(latent_dim, name="z_mean")(x)
+        z_log_var = layers.Dense(latent_dim, name="z_log_var")(x)
+        z = Sampling()([z_mean, z_log_var])
+        encoder = keras.Model(inputs, [z_mean, z_log_var, z], name="encoder")
+        encoder.compile()
+
+        # Decoder
+        latent_inputs = Input(shape=(latent_dim,))
+        x = Dense(10 * 128 + len_values, activation='leaky_relu')(latent_inputs)  # Match flattened size
+        # remove the values from the output
+        vals = x[:,-len_values:]
+        x = x[:,:-len_values]
+        x = Reshape((10, 128))(x)  # Output: (10, 128)
+        x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = UpSampling1D(size=2)(x)  # Output: (20, 64)
+        x = Conv1DTranspose(32, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = UpSampling1D(size=2)(x)  # Output: (40, 32)
+        x = Conv1DTranspose(1, 3, activation='linear', padding='same', strides=1)(x)  # Output: (40, 1)
+        decoded = Reshape((out_shape-len_values,))(x)
+        # Concatenate the values to the output
+        decoded = Concatenate()([decoded,vals])
+        decoder = tf.keras.Model(latent_inputs, decoded, name='decoder')
+        decoder.compile()
+
+        print(encoder.summary())
+        print(decoder.summary())
+        
+        std = dataloader.vae_norm["profile"]["std"]
+        mean = dataloader.vae_norm["profile"]["mean"]
+
+        minimum_value = config["min_value"] if config is not None else 0.
+        # normalize to make it correspond to the data
+        minimum_value = minimum_value * std + mean
+
+        autoencoder = VAE(encoder,decoder, [r_loss,k_loss,gain_loss], config=config, min_value = minimum_value, physical_penalty_weight=physical_penalty_weight)
+
+        return autoencoder, encoder, decoder

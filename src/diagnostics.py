@@ -52,6 +52,8 @@ class Diagnostics():
         z = encoder.predict(dataset_batched)[-1]
         tilde_laser = decoder.predict(z)
         data, label = data_loader.get_x_y()
+        if self.config["DataType"] == "COILS-MULTI":
+            values = self.config["values"]
         
         np.savetxt(self.res_folder / 'latent_z.txt',z)
 
@@ -112,6 +114,42 @@ class Diagnostics():
             plt.title("Erreur de reconstruction du profil de pas")
             plt.savefig(self.res_folder / "hist_error_pas.png")
             plt.close()
+        
+        elif self.config["DataType"] == "COILS-MULTI":
+            vae_norm = data_loader.vae_norm
+            length_values = len(values)
+            predicted_profile = tilde_laser[:,:-length_values] * vae_norm["profile"]["std"] + vae_norm["profile"]["mean"]
+            profile = data[:,:-length_values] * vae_norm["profile"]["std"] + vae_norm["profile"]["mean"]
+            predicted_values = []
+            true_values = []
+            for i, value in enumerate(values):
+                predicted_values.append(tilde_laser[:,-length_values+i] / self.config["gain_weight"] * vae_norm[value]["std"] + vae_norm[value]["mean"])
+                true_values.append(data[:,-length_values+i] / self.config["gain_weight"] * vae_norm[value]["std"] + vae_norm[value]["mean"])
+            
+            error_profile = []
+            for i in range(len(data)):
+                error_profile.append( np.max(np.abs(profile[i] - predicted_profile[i]) / np.abs(profile[i])) )
+            
+            plt.figure()
+            plt.hist(np.array(error_profile) * 100 ,bins=30)
+            plt.title("Erreur de reconstruction du profil de pas")
+            plt.savefig(self.res_folder / "hist_error_pas.png")
+            plt.close()
+            
+            error_values = []
+            for i, value in enumerate(values):
+                true_value = true_values[i]
+                predicted_value = predicted_values[i]
+                error_value = []
+                for j in range(len(data)):
+                    error_value.append( np.abs(true_value[j] - predicted_value[j]) / np.abs(true_value[j]) )
+                error_values.append(error_value)
+                plt.figure()
+                plt.hist(np.array(error_value) * 100 ,bins=30)
+                plt.title(f"Erreur de reconstruction de {value}")
+                plt.savefig(self.res_folder / f"hist_error_{value}.png")
+                plt.close()            
+
 
         else:
             error = []
@@ -231,7 +269,42 @@ class Diagnostics():
             plt.yscale("log")
             plt.savefig(self.res_folder / f"hist_gain.png")
             plt.close()
+        
+        elif self.config["DataType"] == "COILS-MULTI":
+            index_max = np.argmax(np.array(error_profile))
+            index_min = np.argmin(np.array(error_profile))
 
+            plt.figure()
+            plt.plot(predicted_profile[index_max], label=f"Reconstruction, cutoff = {predicted_values[0][index_max]} ", c = 'r')
+            plt.plot(profile[index_max], label=f"True, cutoff = {true_values[0][index_max]} ", c = 'g')
+            plt.legend()
+            plt.savefig(self.res_folder / "max_error_pas.png")
+            plt.close()
+
+            plt.figure()
+            plt.plot(predicted_profile[index_min], label=f"Reconstruction, cutoff = {predicted_values[0][index_min]} ", c = 'r')
+            plt.plot(profile[index_min], label=f"True, cutoff = {true_values[0][index_min]} ", c = 'g')
+            plt.legend()
+            plt.savefig(self.res_folder / "min_error_pas.png")
+            plt.close()
+
+            for i, value in enumerate(values):
+                index_max = np.argmax(np.array(error_values[i]))
+                index_min = np.argmin(np.array(error_values[i]))
+
+                plt.figure()
+                plt.plot(predicted_profile[index_max], label=f"Reconstruction, {value} = {predicted_values[i][index_max]} ", c = 'r')
+                plt.plot(profile[index_max], label=f"True, {value} = {true_values[i][index_max]} ", c = 'g')
+                plt.legend()
+                plt.savefig(self.res_folder / f"max_error_{value}.png")
+                plt.close()
+
+                plt.figure()
+                plt.plot(predicted_profile[index_min], label=f"Reconstruction, {value} = {predicted_values[i][index_min]} ", c = 'r')
+                plt.plot(profile[index_min], label=f"True, {value} = {true_values[i][index_min]} ", c = 'g')
+                plt.legend()
+                plt.savefig(self.res_folder / f"min_error_{value}.png")
+                plt.close()
 
 
         else:
@@ -259,7 +332,7 @@ class Diagnostics():
             l = label * data_loader.gain_norm[key]
             plt.figure()            
             plt.hist(l ,bins=30)
-            plt.title("Distribution des gains")
+            plt.title(f"Distribution des {key}")
             plt.yscale("log")
             plt.savefig(self.res_folder / f"hist_{key}.png")
             plt.close()

@@ -46,7 +46,7 @@ class Trainer(ABC):
         folder_name = f"std_{name}_{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}_{model}"
         if model == "2D-MNIST-MoG":
             folder_name += f"_gaussians_{num_components}"
-        if model == "1D-COILS-GAIN":
+        if model == "1D-COILS-GAIN" or model == "COILS-MULTI" or model == "COILS-MULTI-OUT":
             gain_weight = self.config["gain_weight"]
             folder_name += f"_gw_{gain_weight}"
             if self.config["sep_loss"]:
@@ -54,6 +54,10 @@ class Trainer(ABC):
                 folder_name += f"_gl_{gain_loss}"
                 r_loss = self.config["r_loss"]
                 folder_name += f"_rl_{r_loss}"
+        if model == "COILS-MULTI" or model == "COILS-MULTI-OUT":
+            values = self.config["values"]
+            for value in values:
+                folder_name += f"_{value}"
         folder_name += f"_phys_{physical_penalty_weight}"
         folder_name += f"_epochs_{epoch_vae}"
         self.res_folder = results_path / folder_name
@@ -294,6 +298,52 @@ class TrainerGain(Trainer):
         dataset = self.data_loader.get_tf_dataset()
 
         input_shape = self.data_loader.get_shape()
+        print(f"\nInput shape: {input_shape}")
+            
+        # Get VAE model_selector
+        models = self.model_selector.get_model(
+            input_shape = input_shape,
+            latent_dim  = latent_dim,
+            num_components = num_components,
+            k_loss      = kl_loss,
+            gain_loss   = gain_loss,
+            r_loss = r_loss,
+            config = config,
+            dataloader = self.data_loader,
+            physical_penalty_weight = physical_penalty_weight,
+        )
+        
+        history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
+        _, encoder, decoder = models["vae"]
+        
+        # Saving latent space
+        batch_size = 256
+        dataset_batched, _ = self.data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
+        z = encoder.predict(dataset_batched)[-1]
+        np.savetxt(self.res_folder / 'latent_z.txt',z)
+        return history
+
+
+
+    def __init__(self,model_selector : ModelSelector, data_loader : DataLoader, config):
+        super().__init__(model_selector, data_loader, config)
+        
+    def train(self):
+        self.train_vae()
+    
+    def train_vae(self):
+        config = self.config
+        kl_loss = config["kl_loss"]
+        gain_loss = config["gain_loss"]
+        latent_dim =  config["latent_dim"]
+        num_components = config["num_components"]
+        r_loss = config["r_loss"]
+        physical_penalty_weight = config["physical_penalty_weight"]
+        
+        dataset = self.data_loader.get_tf_dataset()
+
+        input_shape = self.data_loader.get_shape()
+        print(f"\nInput shape: {input_shape}")
             
         # Get VAE model_selector
         models = self.model_selector.get_model(

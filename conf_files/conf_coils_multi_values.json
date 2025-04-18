@@ -1,0 +1,31 @@
+{
+    "DataType" : "COILS-MULTI",
+    "Model" : {
+        "vae" : "COILS-MULTI-OUT"
+    },
+    "dataset_path": "datasets/dataset800.npy",
+    "results_dir": "testing_coils_multi/",
+    "name": "dyn-shell",
+    "sep_loss" : 0,
+    "epoch_vae": 3000,
+    "epoch_rna": 5,
+    "latent_dim": 10,
+    "batch_size_vae": 256,
+    "batch_size_rna": 128,
+    "min_value": 0.2,
+    "kl_loss": 1e-5,
+    "r_loss" : 1,
+    "gain_loss" : 1,
+    "physical_penalty_weight" : 0,
+    "gain_weight" : 10,
+    "training" : [],
+    "values" : ["cutoff", "e99"],
+    "num_components" : 1,
+    "reprise" : {
+        "gain_only" : 0,
+        "result_folder" : "./testing_coils_multi/"
+    },
+    "filter" : {
+        "cutoff" : 2e-6
+    }
+}

@@ -436,6 +436,132 @@ class DataLoaderMNIST(DataLoader):
         
     def get_shape(self):
         return self.dataset["data"].shape[1:] 
+
+
+
+class DataLoaderCoilsMulti(DataLoader):
+    """
+    Incorporates the gain in the data to predict the gain in the VAE model.
+    """
+        
+    def __init__(self, config, result_folder=None):
+        self._preprocessed = False
+        self.gain_norm = {}
+        self.vae_norm = 1.
+        super().__init__(config, result_folder)
+        
+    def preprocessing(self):
+        filter          = self.config.get("filter", None)
+        if filter is not None: self.apply_mask(filter)   
+        if not self._preprocessed:
+            self._normalize_data()
+            self._preprocessed = True
         
         
+    def get_x_y(self, value = 'cutoff'):
+        x = self.dataset['data']
+        y = self.dataset['values'][value]
+
+        return(x,y)
         
+    def _normalize_data(self):
+        """Normalize data to be in the range [0, 1].
+        
+        Returns:
+            normalized_data: The normalized data.
+        """
+        # Normalize data to be in the range [-1, 1]
+        self.dataset['data'] = np.array(self.dataset['data'])
+        
+        # Z-scoring normalization
+        length_values = len(self.dataset['values'].keys())
+
+
+        self.dataset['data'][:,:-length_values] = (self.dataset['data'][:,:-length_values] - self.vae_norm["profile"]["mean"]) / self.vae_norm["profile"]["std"]
+        for i, key in enumerate(self.dataset['values'].keys()):
+            self.dataset['data'][:,-length_values+i] = (self.dataset['data'][:,-length_values+i] - self.vae_norm[key]["mean"]) / self.vae_norm[key]["std"]
+
+        values_weight = self.config["gain_weight"]
+        self.dataset['data'][:, -length_values:] = self.dataset['data'][:, -length_values:] * values_weight
+
+        
+    def apply_mask(self,filter):
+        keys = list(filter.keys())
+        for key in keys:
+            if key not in self.dataset['values'].keys():
+                raise ValueError(f"The key {key} is not in the dataset. Please check the filter.")
+            val_to_mask = np.array(self.dataset['values'][key])
+            mask = val_to_mask >= filter[key]
+        
+            self.dataset['values'][key] = np.array(self.dataset['values'][key])[mask]
+            
+            self.dataset['data'] = np.array(self.dataset['data'])[mask]
+            self.dataset['name'] = np.array(self.dataset['name'])[mask]
+
+            print("\nNumbers of samples that will get filtered out: ", len(self.dataset['data']) - len(mask[mask == True]))
+            print("\nNumbers of samples that will be used: ", len(mask[mask == True]))
+        
+        if self.dataset['data'].shape[0] == 0:
+            raise ValueError(f"No data left after applying filter. Filters might be too high.")
+
+
+    def get_shape(self):
+        if len(self.dataset['data'].shape[1:]) == 1:
+            return (self.dataset['data'].shape[1], 1)
+        return self.dataset['data'].shape[1:]
+
+    def _load_data(self) -> dict:
+        """Load dataset from .npy file.
+        """
+
+        loaded_dataset = np.load(self.dataset_path, allow_pickle=True).item()
+
+        self.values = self.config["values"]
+        
+        loaded_dataset['data'] = np.array(loaded_dataset['data'])
+        std = np.std(loaded_dataset["data"])
+        mean = np.mean(loaded_dataset["data"])
+        self.vae_norm = {"profile": {"mean": mean, "std": std}}
+        
+        for value in self.values:
+            loaded_dataset['values'][value] = np.array(loaded_dataset['values'][value])
+            std = np.std(loaded_dataset['values'][value])
+            mean = np.mean(loaded_dataset['values'][value])
+            self.vae_norm[value] = {"mean": mean, "std": std}
+        
+        # incorporate the values in the data
+        for value in self.values:
+            val = loaded_dataset['values'][value]
+            val = np.expand_dims(val, axis=-1)
+            loaded_dataset['data'] = np.concatenate((loaded_dataset['data'], val), axis=-1)
+        
+        # remove keys that are not in the values list
+        values = list(loaded_dataset['values'].keys())
+        for key in values:
+            if key not in self.values:
+                del loaded_dataset['values'][key]
+        
+        return(loaded_dataset)
+    
+    def _load_model(self) -> dict:
+        """Load model.
+        returns:
+            encoder (tf.keras.models): Encoder model.
+            decoder (tf.keras.models): Decoder model.
+            latent_space (np.array): Latent space.
+        """    
+        encoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-encoder.keras"),
+                                        custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+
+        decoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder.keras"),
+                                        custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+
+        latent_space = np.loadtxt(os.path.join(self.result_folder,"latent_z.txt"))
+        
+        model = {
+            "encoder": encoder, 
+            "decoder": decoder,
+            "latent_space": latent_space,
+        }
+        
+        return(model)
