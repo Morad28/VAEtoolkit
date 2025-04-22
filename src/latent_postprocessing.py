@@ -194,6 +194,10 @@ class PostprocessingBase(ABC):
                 sc = self.ax_main.scatter(self.latent_space[:, self.x_axis_var.get()], self.latent_space[:, self.y_axis_var.get()], c = gg)
                 self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()}")
                 self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()}")
+        
+        '''margin = 50  # Adjust this value to control the margin
+        self.ax_main.set_xlim(-3 - margin, 3 + margin)
+        self.ax_main.set_ylim(-3 - margin, 3 + margin)'''
             
         if hasattr(self, 'scatter_cb'):
             self.scatter_cb.update_normal(sc)
