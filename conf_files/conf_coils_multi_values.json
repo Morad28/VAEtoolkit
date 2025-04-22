@@ -13,7 +13,7 @@
     "batch_size_vae": 256,
     "batch_size_rna": 128,
     "min_value": 0.15,
-    "kl_loss": 1e-5,
+    "kl_loss": 1e-3,
     "r_loss" : 1,
     "gain_loss" : 1,
     "physical_penalty_weight" : 0,
