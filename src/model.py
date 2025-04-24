@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 from keras import layers, losses, Model
 from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTranspose, MaxPooling2D, Flatten, Reshape, MaxPooling1D, UpSampling1D, Concatenate
-from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG
+from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG, VAE_multi_decoder
 
 
 class ModelSelector:
@@ -476,7 +476,7 @@ class ModelSelector:
         vals = inputs[:,-len_values:,:]
         vals = Flatten()(vals)
 
-        out_shape = input_shape[0]
+        out_shape = input_shape[0] - len_values
         
         # Encoder
         x = Conv1D(32, 3, activation='leaky_relu', padding='same', strides=1)(profile)
@@ -485,7 +485,7 @@ class ModelSelector:
         x = MaxPooling1D(pool_size=2)(x)  # Output: (10, 64)
         x = Conv1D(128, 3, activation='leaky_relu', padding='same', strides=1)(x)
         x = Flatten()(x)  # Output: (1280,)
-        x = Concatenate()([x,vals])
+        #x = Concatenate()([x,vals])
 
         x = Dense(128, activation='leaky_relu')(x)  # Add a dense layer before the latent space
 
@@ -495,34 +495,39 @@ class ModelSelector:
         encoder = keras.Model(inputs, [z_mean, z_log_var, z], name="encoder")
         encoder.compile()
 
-        # Decoder
+        # Decoder CNN (profile)
         latent_inputs = Input(shape=(latent_dim,))
-        x = Dense(10 * 128 + len_values, activation='leaky_relu')(latent_inputs)  # Match flattened size
+        x = Dense(10 * 128, activation='leaky_relu')(latent_inputs)  # Match flattened size
         # remove the values from the output
-        vals = x[:,-len_values:]
-        x = x[:,:-len_values]
         x = Reshape((10, 128))(x)  # Output: (10, 128)
         x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
         x = UpSampling1D(size=2)(x)  # Output: (20, 64)
         x = Conv1DTranspose(32, 3, activation='leaky_relu', padding='same', strides=1)(x)
         x = UpSampling1D(size=2)(x)  # Output: (40, 32)
         x = Conv1DTranspose(1, 3, activation='linear', padding='same', strides=1)(x)  # Output: (40, 1)
-        decoded = Reshape((out_shape-len_values,))(x)
+        decoded = Reshape((out_shape,))(x)
         # Concatenate the values to the output
-        decoded = Concatenate()([decoded,vals])
-        decoder = tf.keras.Model(latent_inputs, decoded, name='decoder')
-        decoder.compile()
+        decoder_cnn = tf.keras.Model(latent_inputs, decoded, name='decoder')
+        decoder_cnn.compile()
+
+        x2 = Dense(10 * 128, activation='leaky_relu')(latent_inputs)
+        x2 = Dense(64, activation='leaky_relu')(x2)
+        predictions = Dense(len_values, activation='linear')(x2)
+        predictions = Reshape((len_values,))(predictions)
+        decoder_mlp = tf.keras.Model(latent_inputs, predictions, name='decoder2')
+        decoder_mlp.compile()
 
         print(encoder.summary())
-        print(decoder.summary())
+        print(decoder_cnn.summary())
+        print(decoder_mlp.summary())
         
         std = dataloader.vae_norm["profile"]["std"]
         mean = dataloader.vae_norm["profile"]["mean"]
 
-        minimum_value = config["min_value"] if config is not None else 0.
+        minimum_value = config["min_value"] if config else 0.
         # normalize to make it correspond to the data
         minimum_value = minimum_value * std + mean
 
-        autoencoder = VAE(encoder,decoder, [r_loss,k_loss,gain_loss], config=config, min_value = minimum_value, physical_penalty_weight=physical_penalty_weight)
+        autoencoder = VAE_multi_decoder(encoder, [decoder_cnn, decoder_mlp], [r_loss,k_loss,gain_loss], config=config, min_value = minimum_value, physical_penalty_weight=physical_penalty_weight)
 
-        return autoencoder, encoder, decoder
+        return autoencoder, encoder, decoder_cnn, decoder_mlp

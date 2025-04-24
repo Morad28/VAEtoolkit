@@ -70,7 +70,13 @@ class Trainer(ABC):
         
         self._create_folder()
         epoch_vae = self.config["epoch_vae"]
-        autoencoder, encoder, decoder = models["vae"]
+        # Handle multiple decoders
+        if len(models["vae"]) == 3:
+            autoencoder, encoder, decoder = models["vae"]
+            multi_decoder = False
+        elif len(models["vae"]) == 4:
+            autoencoder, encoder, decoder_cnn, decoder_mlp = models["vae"]
+            multi_decoder = True
 
         
         '''lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
@@ -112,9 +118,13 @@ class Trainer(ABC):
 
         autoencoder.save(self.res_folder / "model.keras")
         encoder.save(self.res_folder / 'encoder_model.keras')
-        decoder.save(self.res_folder / 'decoder_model.keras')
-        
-        self.models["vae"] = (autoencoder, encoder, decoder)
+        if multi_decoder:
+            decoder_cnn.save(self.res_folder / 'decoder_cnn_model.keras')
+            decoder_mlp.save(self.res_folder / 'decoder_mlp_model.keras')
+            self.models["vae"] = (autoencoder, encoder, decoder_cnn, decoder_mlp)
+        else:
+            decoder.save(self.res_folder / 'decoder_model.keras')
+            self.models["vae"] = (autoencoder, encoder, decoder)
         
         return history
     
@@ -314,7 +324,7 @@ class TrainerGain(Trainer):
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
-        _, encoder, decoder = models["vae"]
+        _, encoder, *decoder = models["vae"]
         
         # Saving latent space
         batch_size = 256
@@ -359,7 +369,7 @@ class TrainerGain(Trainer):
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
-        _, encoder, decoder = models["vae"]
+        _, encoder, *decoder = models["vae"]
         
         # Saving latent space
         batch_size = 256

@@ -46,11 +46,21 @@ class Diagnostics():
         plt.close()
         
     def save_errors(self, data_loader : DataLoader):
-        autoencoder, encoder, decoder =  self.trainer.models["vae"]
+        cnn_mlp_diff = False
+        if len(self.trainer.models["vae"]) == 3:
+            autoencoder, encoder, decoder =  self.trainer.models["vae"]
+        elif len(self.trainer.models["vae"]) == 4:
+            autoencoder, encoder, decoder_cnn, decoder_mlp =  self.trainer.models["vae"]
+            cnn_mlp_diff = True
         batch_size = 256
         dataset_batched, _ = data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
         z = encoder.predict(dataset_batched)[-1]
-        tilde_laser = decoder.predict(z)
+        if cnn_mlp_diff:
+            predicted_profile = decoder_cnn.predict(z)
+            predicted_gain = decoder_mlp.predict(z)
+            tilde_laser = np.concatenate((predicted_profile, predicted_gain), axis=1)
+        else:
+            tilde_laser = decoder.predict(z)
         data, label = data_loader.get_x_y()
         if self.config["DataType"] == "COILS-MULTI":
             values = self.config["values"]

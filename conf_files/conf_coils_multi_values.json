@@ -1,10 +1,10 @@
 {
     "DataType" : "COILS-MULTI",
     "Model" : {
-        "vae" : "COILS-MULTI"
+        "vae" : "COILS-MULTI-OUT"
     },
-    "dataset_path": "datasets/dataset3200.npy",
-    "results_dir": "testing_coils_multi_3200/",
+    "dataset_path": "datasets/dataset4800.npy",
+    "results_dir": "testing_coils_multi_4800/",
     "name": "dyn-shell",
     "sep_loss" : 0,
     "epoch_vae": 2000,
@@ -23,7 +23,7 @@
     "num_components" : 1,
     "reprise" : {
         "gain_only" : 0,
-        "result_folder" : "./testing_coils_multi_3200/"
+        "result_folder" : "./testing_coils_multi_4800/"
     },
     "filter" : {
         "cutoff" : 2e-6

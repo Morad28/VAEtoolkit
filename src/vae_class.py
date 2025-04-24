@@ -575,3 +575,191 @@ class VAE_MoG(keras.Model):
         )
         self.decoder = keras.models.load_model(f"{filename}-decoder.keras")
         print("Reloaded.")
+
+class VAE_multi_decoder(keras.Model):
+    '''
+    A VAE model, built from given encoder and decoder
+    '''
+
+    version = '1.4'
+
+    def __init__(self, encoder=None, decoders=None, loss_weights=[1,1,1], config=None, min_value=0.3, physical_penalty_weight=1., **kwargs):
+        '''
+        VAE instantiation with encoder, decoder and r_loss_factor
+        args :
+            encoder : Encoder model
+            decoder : Decoder model
+            loss_weights : Weight of the loss functions: reconstruction_loss and kl_loss
+            r_loss_factor : Proportion of reconstruction loss for global loss (0.3)
+        return:
+            None
+        '''
+        super(VAE_multi_decoder, self).__init__(**kwargs)
+        self.physical_penalty_weight = physical_penalty_weight
+        self.config = config
+        self.min_value = min_value
+        self.encoder      = encoder
+        self.decoders      = decoders
+        self.loss_weights = loss_weights
+        self.total_loss_tracker = keras.metrics.Mean(name="loss")
+        self.reconstruction_loss_tracker = keras.metrics.Mean(
+            name="r_loss"
+        )
+        self.gain_loss_tracker = keras.metrics.Mean(name="gain_loss")
+        self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
+        self.physical_loss_tracker = keras.metrics.Mean(name="physical_penalty")
+        
+
+
+    @property
+    def metrics(self):
+        return [
+            self.total_loss_tracker,
+            self.reconstruction_loss_tracker,
+            self.kl_loss_tracker,
+            self.gain_loss_tracker,
+            self.physical_loss_tracker
+        ]
+       
+    @tf.function
+    def call(self, inputs):
+        '''
+        Model forward pass, when we use our model
+        args:
+            inputs : Model inputs
+        return:
+            output : Output of the model 
+        '''
+        z_mean, z_log_var, z = self.encoder(inputs)
+        outputs = [decoder(z) for decoder in self.decoders]
+        return outputs
+                
+    @tf.function
+    def train_step(self, data):
+        '''
+        Implementation of the training update for multiple decoders.
+        args:
+            data : Model inputs
+        return:
+            Dictionary of losses
+        '''
+        input = data
+        k1, k2, k3 = self.loss_weights
+        len_values = len(self.config["values"])
+
+        with tf.GradientTape() as tape:
+            # Encoder forward pass
+            z_mean, z_log_var, z = self.encoder(input)
+
+            # Decoder forward passes
+            reconstructions = [decoder(z) for decoder in self.decoders]
+
+            # switch to float32
+            input = tf.cast(input, dtype=tf.float32)
+            reconstructions = [tf.cast(reconstruction, dtype=tf.float32) for reconstruction in reconstructions]
+
+            # Compute reconstruction losses
+            reconstruction_loss_profile = k1 * tf.reduce_mean(tf.square(input[:, :-len_values] - reconstructions[0]))
+            reconstruction_loss_values = k3 * tf.reduce_mean(tf.square(input[:, -len_values:] - reconstructions[1]))
+
+            # Combine reconstruction losses
+            reconstruction_loss = reconstruction_loss_profile + reconstruction_loss_values
+
+            # KL divergence loss
+            kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
+            kl_loss = -tf.reduce_mean(kl_loss) * k2
+
+            # Total loss
+            total_loss = reconstruction_loss + kl_loss
+
+        # Backpropagation
+        grads = tape.gradient(total_loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+
+        # Update metrics
+        self.total_loss_tracker.update_state(total_loss)
+        self.reconstruction_loss_tracker.update_state(reconstruction_loss_profile)
+        self.gain_loss_tracker.update_state(reconstruction_loss_values)
+        self.kl_loss_tracker.update_state(kl_loss)
+
+        return {
+            "loss": self.total_loss_tracker.result(),
+            "r_loss": self.reconstruction_loss_tracker.result(),
+            "kl_loss": self.kl_loss_tracker.result(),
+            "gain_loss": self.gain_loss_tracker.result(),
+        }
+    
+    @tf.function
+    def test_step(self, data):
+        '''
+        Implementation of the evaluation step for multiple decoders.
+        args:
+            data : Validation inputs
+        return:
+            Dictionary of losses
+        '''
+        input = data
+        k1, k2, k3 = self.loss_weights
+        len_values = len(self.config["values"])
+
+        # Encoder forward pass
+        z_mean, z_log_var, z = self.encoder(input)
+
+        # Decoder forward passes
+        reconstructions = [decoder(z) for decoder in self.decoders]
+
+        # switch to float32
+        input = tf.cast(input, dtype=tf.float32)
+        reconstructions = [tf.cast(reconstruction, dtype=tf.float32) for reconstruction in reconstructions]
+
+        # Compute reconstruction losses
+        reconstruction_loss_profile = k1 * tf.reduce_mean(tf.square(input[:, :-len_values] - reconstructions[0]))
+        reconstruction_loss_values = k3 * tf.reduce_mean(tf.square(input[:, -len_values:] - reconstructions[1]))
+
+        # Combine reconstruction losses
+        reconstruction_loss = reconstruction_loss_profile + reconstruction_loss_values
+
+        # KL divergence loss
+        kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
+        kl_loss = -tf.reduce_mean(kl_loss) * k2
+
+        # Total loss
+        total_loss = reconstruction_loss + kl_loss
+
+        # Update metrics
+        self.total_loss_tracker.update_state(total_loss)
+        self.reconstruction_loss_tracker.update_state(reconstruction_loss_profile)
+        self.gain_loss_tracker.update_state(reconstruction_loss_values)
+        self.kl_loss_tracker.update_state(kl_loss)
+
+        return {
+            "loss": self.total_loss_tracker.result(),
+            "r_loss": self.reconstruction_loss_tracker.result(),
+            "kl_loss": self.kl_loss_tracker.result(),
+            "gain_loss": self.gain_loss_tracker.result(),
+        }
+    
+    def predict(self,inputs):
+        '''Our predict function...'''
+        z_mean, z_var, z  = self.encoder.predict(inputs)
+        outputs           = self.decoder.predict(z)
+        return outputs
+
+    def save(self,filename):
+        '''Save model in 2 part'''
+        filename, extension = os.path.splitext(filename)
+        self.encoder.save(f'{filename}-encoder.keras')
+        if isinstance(self.decoders, list):
+            for i, decoder in enumerate(self.decoders):
+                decoder.save(f'{filename}-decoder-{i}.keras')
+        else:
+            self.decoders.save(f'{filename}-decoder.keras')
+
+    def reload(self,filename):
+        '''Reload a 2 part saved model.'''
+        filename, extension = os.path.splitext(filename)
+        self.encoder = keras.ModelSelector.load_model(f'{filename}-encoder.keras', custom_objects={'SamplingLayer': SamplingLayer})
+        self.decoder = keras.ModelSelector.load_model(f'{filename}-decoder.keras')
+        print('Reloaded.')
+
+
