@@ -17,7 +17,7 @@
     "r_loss" : 1,
     "gain_loss" : 1,
     "physical_penalty_weight" : 0,
-    "gain_weight" : 10,
+    "gain_weight" : 30,
     "training" : [],
     "values" : ["e99"],
     "num_components" : 1,
