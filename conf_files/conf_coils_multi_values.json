@@ -1,7 +1,7 @@
 {
     "DataType" : "COILS-MULTI",
     "Model" : {
-        "vae" : "COILS-MULTI-OUT"
+        "vae" : "COILS-MULTI"
     },
     "dataset_path": "datasets/dataset6000_addon.npy",
     "results_dir": "testing_coils_multi_6000/",
@@ -17,7 +17,7 @@
     "r_loss" : 1,
     "gain_loss" : 1,
     "physical_penalty_weight" : 0,
-    "gain_weight" : 1,
+    "gain_weight" : 10,
     "training" : [],
     "values" : ["e99"],
     "num_components" : 1,

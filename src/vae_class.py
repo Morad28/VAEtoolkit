@@ -617,24 +617,7 @@ class VAE_multi_decoder(keras.Model):
         ) # Learning rate schedule for MNIST
 
         self.optimizer_cnn = tf.keras.optimizers.AdamW(learning_rate=lr_schedule)
-        self.optimizer_mlp = tf.keras.optimizers.AdamW(
-                                    learning_rate=0.001,
-                                    weight_decay=0.004,
-                                    beta_1=0.9,
-                                    beta_2=0.999,
-                                    epsilon=1e-07,
-                                    amsgrad=False,
-                                    clipnorm=None,
-                                    clipvalue=None,
-                                    global_clipnorm=None,
-                                    use_ema=False,
-                                    ema_momentum=0.99,
-                                    ema_overwrite_frequency=None,
-                                    loss_scale_factor=None,
-                                    gradient_accumulation_steps=None,
-                                    name='adamw',
-                                    **kwargs
-                                )
+        self.optimizer_mlp = tf.keras.optimizers.AdamW(learning_rate=lr_schedule)
         
 
 

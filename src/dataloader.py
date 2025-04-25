@@ -559,18 +559,31 @@ class DataLoaderCoilsMulti(DataLoader):
         encoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-encoder.keras"),
                                         custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
 
-        decoder0 = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder-0.keras"),
-                                        custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
-        decoder1 = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder-1.keras"),
-                                        custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT":
+            decoder0 = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder-0.keras"),
+                                            custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+            decoder1 = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder-1.keras"),
+                                            custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
 
-        latent_space = np.loadtxt(os.path.join(self.result_folder,"latent_z.txt"))
-        
-        model = {
-            "encoder": encoder, 
-            "decoder_cnn": decoder0,
-            "decoder_mlp": decoder1,
-            "latent_space": latent_space,
-        }
+            latent_space = np.loadtxt(os.path.join(self.result_folder,"latent_z.txt"))
+            
+            model = {
+                "encoder": encoder, 
+                "decoder_cnn": decoder0,
+                "decoder_mlp": decoder1,
+                "latent_space": latent_space,
+            }
+        else:
+            decoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder.keras"),
+                                            custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+            
+            latent_space = np.loadtxt(os.path.join(self.result_folder,"latent_z.txt"))
+            
+            model = {
+                "encoder": encoder, 
+                "decoder": decoder,
+                "latent_space": latent_space,
+            }
+
         
         return(model)
