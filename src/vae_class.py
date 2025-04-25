@@ -605,9 +605,36 @@ class VAE_multi_decoder(keras.Model):
         self.reconstruction_loss_tracker = keras.metrics.Mean(
             name="r_loss"
         )
-        self.gain_loss_tracker = keras.metrics.Mean(name="gain_loss")
         self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
+        self.values_loss_tracker = keras.metrics.Mean(name="values_loss")
         self.physical_loss_tracker = keras.metrics.Mean(name="physical_penalty")
+
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=1e-4,
+            decay_steps=2500,
+            decay_rate=0.95,
+            staircase=True
+        ) # Learning rate schedule for MNIST
+
+        self.optimizer_cnn = tf.keras.optimizers.AdamW(learning_rate=lr_schedule)
+        self.optimizer_mlp = tf.keras.optimizers.AdamW(
+                                    learning_rate=0.001,
+                                    weight_decay=0.004,
+                                    beta_1=0.9,
+                                    beta_2=0.999,
+                                    epsilon=1e-07,
+                                    amsgrad=False,
+                                    clipnorm=None,
+                                    clipvalue=None,
+                                    global_clipnorm=None,
+                                    use_ema=False,
+                                    ema_momentum=0.99,
+                                    ema_overwrite_frequency=None,
+                                    loss_scale_factor=None,
+                                    gradient_accumulation_steps=None,
+                                    name='adamw',
+                                    **kwargs
+                                )
         
 
 
@@ -617,7 +644,7 @@ class VAE_multi_decoder(keras.Model):
             self.total_loss_tracker,
             self.reconstruction_loss_tracker,
             self.kl_loss_tracker,
-            self.gain_loss_tracker,
+            self.values_loss_tracker,
             self.physical_loss_tracker
         ]
        
@@ -647,7 +674,7 @@ class VAE_multi_decoder(keras.Model):
         k1, k2, k3 = self.loss_weights
         len_values = len(self.config["values"])
 
-        with tf.GradientTape() as tape:
+        with tf.GradientTape(persistent=True) as tape:
             # Encoder forward pass
             z_mean, z_log_var, z = self.encoder(input)
 
@@ -662,31 +689,35 @@ class VAE_multi_decoder(keras.Model):
             reconstruction_loss_profile = k1 * tf.reduce_mean(tf.square(input[:, :-len_values] - reconstructions[0]))
             reconstruction_loss_values = k3 * tf.reduce_mean(tf.square(input[:, -len_values:] - reconstructions[1]))
 
-            # Combine reconstruction losses
-            reconstruction_loss = reconstruction_loss_profile + reconstruction_loss_values
 
             # KL divergence loss
             kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
             kl_loss = -tf.reduce_mean(kl_loss) * k2
 
             # Total loss
-            total_loss = reconstruction_loss + kl_loss
+            reconstruction_loss_profile = reconstruction_loss_profile + kl_loss
+            total_loss = reconstruction_loss_profile + reconstruction_loss_values
 
         # Backpropagation
-        grads = tape.gradient(total_loss, self.trainable_weights)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        grads_encoder = tape.gradient(reconstruction_loss_profile, self.encoder.trainable_weights)
+        grads_cnn = tape.gradient(reconstruction_loss_profile, self.decoders[0].trainable_weights)
+        grads_mlp = tape.gradient(reconstruction_loss_values, self.decoders[1].trainable_weights)
+
+        self.optimizer.apply_gradients(zip(grads_encoder, self.encoder.trainable_weights))
+        self.optimizer_cnn.apply_gradients(zip(grads_cnn, self.decoders[0].trainable_weights))
+        self.optimizer_mlp.apply_gradients(zip(grads_mlp, self.decoders[1].trainable_weights))
 
         # Update metrics
         self.total_loss_tracker.update_state(total_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss_profile)
-        self.gain_loss_tracker.update_state(reconstruction_loss_values)
+        self.values_loss_tracker.update_state(reconstruction_loss_values)
         self.kl_loss_tracker.update_state(kl_loss)
 
         return {
             "loss": self.total_loss_tracker.result(),
             "r_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
-            "gain_loss": self.gain_loss_tracker.result(),
+            "values_loss": self.values_loss_tracker.result(),
         }
     
     @tf.function
@@ -729,14 +760,14 @@ class VAE_multi_decoder(keras.Model):
         # Update metrics
         self.total_loss_tracker.update_state(total_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss_profile)
-        self.gain_loss_tracker.update_state(reconstruction_loss_values)
+        self.values_loss_tracker.update_state(reconstruction_loss_values)
         self.kl_loss_tracker.update_state(kl_loss)
 
         return {
             "loss": self.total_loss_tracker.result(),
             "r_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
-            "gain_loss": self.gain_loss_tracker.result(),
+            "values_loss": self.values_loss_tracker.result(),
         }
     
     def predict(self,inputs):

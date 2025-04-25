@@ -94,7 +94,7 @@ class Trainer(ABC):
             staircase=True
         ) # Learning rate schedule for MNIST
 
-        optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)   
+        optimizer = tf.keras.optimizers.AdamW(learning_rate=lr_schedule)   
         
         autoencoder.compile(optimizer=optimizer)
         
