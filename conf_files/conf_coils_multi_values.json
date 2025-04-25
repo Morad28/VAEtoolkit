@@ -3,11 +3,11 @@
     "Model" : {
         "vae" : "COILS-MULTI-OUT"
     },
-    "dataset_path": "datasets/dataset4800.npy",
-    "results_dir": "testing_coils_multi_4800/",
+    "dataset_path": "datasets/dataset6000_addon.npy",
+    "results_dir": "testing_coils_multi_6000/",
     "name": "dyn-shell",
     "sep_loss" : 0,
-    "epoch_vae": 2000,
+    "epoch_vae": 1000,
     "epoch_rna": 1,
     "latent_dim": 10,
     "batch_size_vae": 256,
@@ -19,13 +19,14 @@
     "physical_penalty_weight" : 0,
     "gain_weight" : 10,
     "training" : [],
-    "values" : ["cutoff"],
+    "values" : ["e99"],
     "num_components" : 1,
+    "heatmap": "e99",
     "reprise" : {
         "gain_only" : 0,
-        "result_folder" : "./testing_coils_multi_4800/"
+        "result_folder" : "./testing_coils_multi_6000/"
     },
     "filter" : {
-        "cutoff" : 2e-6
+        "e99" : 2e-6
     }
 }

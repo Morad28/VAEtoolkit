@@ -1154,8 +1154,9 @@ class PostprocessingCoilsMulti(PostprocessingBase):
 
     def add_settings(self, parent):
         options = list(self.gain.keys())
+        heat_value = self.config["heatmap"]
         tk.Label(parent, text="Select value").pack(side=tk.TOP)
-        self.gain_entry = tk.StringVar(value="cutoff") # Default to heatmap based on gain
+        self.gain_entry = tk.StringVar(value=heat_value) # Default to heatmap based on gain
         self.gain_entry.trace_add("write", self.plot_main)
         gain_entry_menu = tk.OptionMenu(parent, self.gain_entry, *options)
         gain_entry_menu.pack(side=tk.TOP)
@@ -1203,12 +1204,18 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         
         
     def save_mapping(self, name = "decoding"):
+        raise NotImplementedError("This function is not fully implemented for this class and may " \
+        "therefore not function as intended, remove this line and use at your own risk.")
         mesh, unfit = self._plot_mapping(self.x_axis_var.get(),self.y_axis_var.get())  
         decoding_dataset = tf.data.Dataset.from_tensor_slices(unfit).batch(256)          
         laser_decoded = self.decoder.predict(decoding_dataset,verbose=0)
         value_entry = self.gain_entry.get()
         
-        gain = laser_decoded[:,-self.values_nb] / self.gain_weight * self.vae_norm["cutoff"]["std"] + self.vae_norm["cutoff"]["mean"]
+        vals = []
+        for i, value in enumerate(self.values):
+            pred = laser_decoded[:,-self.values_nb+i] / self.gain_weight * self.vae_norm[value]["std"] + self.vae_norm[value]["mean"]
+            pred = pred * 100 // 1 / 100
+            vals.append(pred)
         laser_decoded = laser_decoded[:,:-self.values_nb]
         
         folder = self.data_loader.result_folder + f"/{name}"
@@ -1217,7 +1224,7 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         np.save(folder+f"{value_entry}_mesh.npy", mesh)
 
         for i in tqdm(range(laser_decoded.shape[0])):
-            np.savetxt(folder+f"/{value_entry}_{i}_{gain[i]}.dat",
+            np.savetxt(folder+f"/{value_entry}_{i}_{vals[i]}.dat",
                 list(zip(self.time,np.abs(laser_decoded[i] * self.vae_norm))))
         messagebox.showinfo("Saved all data in", f"{folder}")
         
@@ -1255,7 +1262,9 @@ class PostprocessingCoilsMulti(PostprocessingBase):
             pca_random_samples = (random_samples)
             random_samples = self._pca.inverse_transform(pca_random_samples)
         
-        predictions = self.decoder.predict(random_samples, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm["cutoff"]["std"] + self.vae_norm["cutoff"]["mean"]
+        optimization_val = self.values[0]
+        
+        predictions = self.decoder.predict(random_samples, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[optimization_val]["std"] + self.vae_norm[optimization_val]["mean"]
         
         # Find the maximum
         max_index = np.argmax(predictions)
@@ -1446,7 +1455,8 @@ class PostprocessingCoilsMulti(PostprocessingBase):
     def _predict_gain(self, dataset):
         n = self._N.get()  # Get the resolution for the mapping
         dataset_batched = tf.data.Dataset.from_tensor_slices(dataset).batch(256)
-        values = self.decoder.predict(dataset_batched, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm["cutoff"]["std"] + self.vae_norm["cutoff"]["mean"]
+        heatmap_value = self.config["heatmap"]
+        values = self.decoder.predict(dataset_batched, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[heatmap_value]["std"] + self.vae_norm[heatmap_value]["mean"]
         values = values.reshape((n, n))
         return (values)
         

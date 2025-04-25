@@ -460,8 +460,14 @@ class DataLoaderCoilsMulti(DataLoader):
         
     def get_x_y(self, value = 'cutoff'):
         x = self.dataset['data']
-        y = self.dataset['values'][value]
-
+        values = self.config["values"]
+        y = []
+        for value in values:
+            if value not in self.dataset['values'].keys():
+                raise ValueError(f"The key {value} is not in the dataset. Please check the filter.")
+            else:
+                y.append(self.dataset['values'][value])
+        y = np.array(y).T
         return(x,y)
         
     def _normalize_data(self):

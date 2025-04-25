@@ -49,7 +49,7 @@ class Trainer(ABC):
         if model == "1D-COILS-GAIN" or model == "COILS-MULTI" or model == "COILS-MULTI-OUT":
             gain_weight = self.config["gain_weight"]
             folder_name += f"_gw_{gain_weight}"
-            if self.config["sep_loss"]:
+            if self.config["sep_loss"] or model == "COILS-MULTI-OUT":
                 gain_loss = self.config["gain_loss"]
                 folder_name += f"_gl_{gain_loss}"
                 r_loss = self.config["r_loss"]

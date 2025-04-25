@@ -510,8 +510,8 @@ class ModelSelector:
         decoder_cnn = tf.keras.Model(latent_inputs, decoded, name='decoder')
         decoder_cnn.compile()
 
-        x2 = Dense(10 * 128, activation='leaky_relu')(latent_inputs)
-        x2 = Dense(64, activation='leaky_relu')(x2)
+        x2 = Dense(64, activation='leaky_relu')(latent_inputs)
+        x2 = Dense(128, activation='leaky_relu')(x2)
         predictions = Dense(len_values, activation='linear')(x2)
         predictions = Reshape((len_values,))(predictions)
         decoder_mlp = tf.keras.Model(latent_inputs, predictions, name='decoder2')

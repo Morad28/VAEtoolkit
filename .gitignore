@@ -11,3 +11,4 @@ testing/
 vaetools.egg-info/
 build/
 pitch_profiles/second_database/
+pitch_profiles/modified_data_with_sinusoidal_variations/
