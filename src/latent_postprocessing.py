@@ -1193,15 +1193,25 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         else:
             dim = self.dim
 
-        prediction_profile = self.decoder_cnn.predict(latent_point,verbose=0)[0]
-        laser = prediction_profile
-        vals = []
-        prediction_values = self.decoder_mlp.predict(latent_point,verbose=0)[0]
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT":
+            prediction_profile = self.decoder_cnn.predict(latent_point,verbose=0)[0]
+            laser = prediction_profile
+            vals = []
+            prediction_values = self.decoder_mlp.predict(latent_point,verbose=0)[0]
 
-        for i, value in enumerate(self.values):
-            pred = prediction_values[i] / self.gain_weight * self.vae_norm[value]["std"] + self.vae_norm[value]["mean"]
-            pred = pred * 100 // 1 / 100
-            vals.append(pred)
+            for i, value in enumerate(self.values):
+                pred = prediction_values[i] / self.gain_weight * self.vae_norm[value]["std"] + self.vae_norm[value]["mean"]
+                pred = pred * 100 // 1 / 100
+                vals.append(pred)
+        
+        else:
+            prediction = self.decoder.predict(latent_point,verbose=0)[0]
+            laser = prediction[:-self.values_nb]
+            vals = []
+            for i, value in enumerate(self.values):
+                pred = prediction[-self.values_nb+i] / self.gain_weight * self.vae_norm[value]["std"] + self.vae_norm[value]["mean"]
+                pred = pred * 100 // 1 / 100
+                vals.append(pred)
     
         self.ax_detail.plot(self.time, laser * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"], label=f" Values: {self.values}={vals}")
         self.ax_detail.set_title("Profiles")
@@ -1270,8 +1280,11 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         
         optimization_val = self.values[0]
         
-        predictions = self.decoder_mlp.predict(random_samples, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[optimization_val]["std"] + self.vae_norm[optimization_val]["mean"]
-        
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT":
+            predictions = self.decoder_mlp.predict(random_samples, verbose=0) / self.gain_weight * self.vae_norm[optimization_val]["std"] + self.vae_norm[optimization_val]["mean"]
+        else:
+            predictions = self.decoder.predict(random_samples, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[optimization_val]["std"] + self.vae_norm[optimization_val]["mean"]
+
         # Find the maximum
         max_index = np.argmax(predictions)
         if self.enablePCA.get():
