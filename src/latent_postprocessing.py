@@ -61,7 +61,11 @@ class PostprocessingBase(ABC):
         """Initialize model-related components."""
         self.latent_space = self.data_loader.model["latent_space"]
         self.encoder = self.data_loader.model["encoder"]
-        self.decoder = self.data_loader.model["decoder"]
+        if "decoder" in self.data_loader.model:
+            self.decoder = self.data_loader.model["decoder"]
+        else:
+            self.decoder_cnn = self.data_loader.model["decoder_cnn"]
+            self.decoder_mlp = self.data_loader.model["decoder_mlp"]
         self.vae_norm = self.data_loader.vae_norm
         self.res_folder = self.data_loader.result_folder
         self.dim = self.latent_space.shape[1]
@@ -1189,11 +1193,13 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         else:
             dim = self.dim
 
-        prediction = self.decoder.predict(latent_point,verbose=0)[0]
-        laser = prediction[:-self.values_nb]
+        prediction_profile = self.decoder_cnn.predict(latent_point,verbose=0)[0]
+        laser = prediction_profile
         vals = []
+        prediction_values = self.decoder_mlp.predict(latent_point,verbose=0)[0]
+
         for i, value in enumerate(self.values):
-            pred = prediction[-self.values_nb+i] / self.gain_weight * self.vae_norm[value]["std"] + self.vae_norm[value]["mean"]
+            pred = prediction_values[i] / self.gain_weight * self.vae_norm[value]["std"] + self.vae_norm[value]["mean"]
             pred = pred * 100 // 1 / 100
             vals.append(pred)
     
@@ -1264,7 +1270,7 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         
         optimization_val = self.values[0]
         
-        predictions = self.decoder.predict(random_samples, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[optimization_val]["std"] + self.vae_norm[optimization_val]["mean"]
+        predictions = self.decoder_mlp.predict(random_samples, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[optimization_val]["std"] + self.vae_norm[optimization_val]["mean"]
         
         # Find the maximum
         max_index = np.argmax(predictions)
