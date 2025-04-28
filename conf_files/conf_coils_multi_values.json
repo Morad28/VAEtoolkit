@@ -13,13 +13,13 @@
     "batch_size_vae": 256,
     "batch_size_rna": 128,
     "min_value": 0.15,
-    "kl_loss": 1e-6,
+    "kl_loss": 1e-5,
     "r_loss" : 1,
     "gain_loss" : 1,
     "physical_penalty_weight" : 0,
     "gain_weight" : 1,
     "training" : [],
-    "values" : ["e99"],
+    "values" : ["e99", "cutoff"],
     "num_components" : 1,
     "heatmap": "e99",
     "reprise" : {
@@ -27,6 +27,7 @@
         "result_folder" : "./testing_coils_multi_6000/"
     },
     "filter" : {
-        "e99" : 2e-6
+        "e99" : 2e-6,
+        "cutoff" : 2e-6
     }
 }
