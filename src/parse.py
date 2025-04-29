@@ -159,6 +159,13 @@ def parse_args():
         help='Take only gain above this threshold'
     )
 
+    parser.add_argument(
+        '--profile_types',
+        type=int,
+        default=1,
+        help='Number of profile types to use'
+    )
+
     # Parse the arguments
     args = parser.parse_args()
     

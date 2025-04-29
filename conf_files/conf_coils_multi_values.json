@@ -9,7 +9,7 @@
     "sep_loss" : 0,
     "epoch_vae": 2000,
     "epoch_rna": 1,
-    "latent_dim": 10,
+    "latent_dim": 5,
     "batch_size_vae": 256,
     "batch_size_rna": 128,
     "min_value": 0.15,
@@ -17,17 +17,17 @@
     "r_loss" : 1,
     "gain_loss" : 1,
     "physical_penalty_weight" : 0,
-    "gain_weight" : 1,
+    "gain_weight" : 10,
     "training" : [],
-    "values" : ["e99", "cutoff"],
+    "values" : ["e99", "e95"],
     "num_components" : 1,
+    "profile_types" : 1,
     "heatmap": "e99",
     "reprise" : {
         "gain_only" : 0,
         "result_folder" : "./testing_coils_multi_6000/"
     },
     "filter" : {
-        "e99" : 2e-6,
-        "cutoff" : 2e-6
+        "e99" : 2e-6
     }
 }
