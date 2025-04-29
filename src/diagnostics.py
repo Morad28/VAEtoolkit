@@ -1,7 +1,7 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
-from .trainer import Trainer
-from .dataloader import DataLoader
+from src.trainer import Trainer
+from src.dataloader import DataLoader
 
 class Diagnostics():
     def __init__(self, config, trainer : Trainer):
