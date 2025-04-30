@@ -75,6 +75,8 @@ class Diagnostics():
             plt.figure()            
             plt.hist(np.array(error) * 100 ,bins=30)
             plt.title("Erreur de reconstruction mse")
+            plt.xlabel("Erreur (%)")
+            plt.ylabel("Nombre d'échantillons")
             plt.savefig(self.res_folder / "hist_mse.png")
             plt.close()
 
@@ -85,6 +87,8 @@ class Diagnostics():
             plt.figure()
             plt.hist(np.array(error2) * 100 ,bins=30)
             plt.title("Erreur de reconstruction absolue")
+            plt.xlabel("Erreur (%)")
+            plt.ylabel("Nombre d'échantillons")
             plt.savefig(self.res_folder / "hist_abs.png")
             plt.close()
 
@@ -95,6 +99,8 @@ class Diagnostics():
             plt.figure()
             plt.hist(np.array(error3) * 100 ,bins=30)
             plt.title("Erreur de reconstruction MAE")
+            plt.xlabel("Erreur (%)")
+            plt.ylabel("Nombre d'échantillons")
             plt.savefig(self.res_folder / "hist_mae.png")
             plt.close()
 
@@ -116,12 +122,16 @@ class Diagnostics():
             plt.figure()
             plt.hist(np.array(error_gain) * 100 ,bins=30)
             plt.title("Erreur de reconstruction du cutoff")
+            plt.xlabel("Erreur (%)")
+            plt.ylabel("Nombre d'échantillons")
             plt.savefig(self.res_folder / "hist_error_cutoff.png")
             plt.close()
 
             plt.figure()
             plt.hist(np.array(error_laser) * 100 ,bins=30)
             plt.title("Erreur de reconstruction du profil de pas")
+            plt.xlabel("Erreur (%)")
+            plt.ylabel("Nombre d'échantillons")
             plt.savefig(self.res_folder / "hist_error_pas.png")
             plt.close()
         
@@ -136,15 +146,44 @@ class Diagnostics():
                 predicted_values.append(tilde_laser[:,-length_values+i] / self.config["gain_weight"] * vae_norm[value]["std"] + vae_norm[value]["mean"])
                 true_values.append(data[:,-length_values+i] / self.config["gain_weight"] * vae_norm[value]["std"] + vae_norm[value]["mean"])
             
-            error_profile = []
-            for i in range(len(data)):
-                error_profile.append( np.max(np.abs(profile[i] - predicted_profile[i]) / np.abs(profile[i])) )
             
-            plt.figure()
-            plt.hist(np.array(error_profile) * 100 ,bins=30)
-            plt.title("Erreur de reconstruction du profil de pas")
-            plt.savefig(self.res_folder / "hist_error_pas.png")
-            plt.close()
+            
+            if self.config["profile_types"] == 2:
+                profile_pitch = profile[:,:40]
+                profile_radius = profile[:,40:] 
+                predicted_profile_pitch = predicted_profile[:,:40]
+                predicted_profile_radius = predicted_profile[:,40:]
+                error_profile_pitch = []
+                error_profile_radius = []
+                for i in range(len(data)):
+                    error_profile_pitch.append( np.max(np.abs(profile_pitch[i] - predicted_profile_pitch[i]) / np.abs(profile_pitch[i])) )
+                    error_profile_radius.append( np.max(np.abs(profile_radius[i] - predicted_profile_radius[i]) / np.abs(profile_radius[i])) )
+                plt.figure()
+                plt.hist(np.array(error_profile_pitch) * 100 ,bins=30)
+                plt.title("Erreur de reconstruction du profil de pas")
+                plt.xlabel("Erreur (%)")
+                plt.ylabel("Nombre d'échantillons")
+                plt.savefig(self.res_folder / "hist_error_pas_pitch.png")
+                plt.close()
+                plt.figure()
+                plt.hist(np.array(error_profile_radius) * 100 ,bins=30)
+                plt.title("Erreur de reconstruction du profil de pas")
+                plt.xlabel("Erreur (%)")
+                plt.ylabel("Nombre d'échantillons")
+                plt.savefig(self.res_folder / "hist_error_pas_radius.png")
+                plt.close()
+            
+            else:
+                error_profile = []
+                for i in range(len(data)):
+                    error_profile.append( np.max(np.abs(profile[i] - predicted_profile[i]) / np.abs(profile[i])) )
+                plt.figure()
+                plt.hist(np.array(error_profile) * 100 ,bins=30)
+                plt.title("Erreur de reconstruction du profil de pas")
+                plt.xlabel("Erreur (%)")
+                plt.ylabel("Nombre d'échantillons")
+                plt.savefig(self.res_folder / "hist_error_pas.png")
+                plt.close()
             
             error_values = []
             for i, value in enumerate(values):
@@ -157,6 +196,8 @@ class Diagnostics():
                 plt.figure()
                 plt.hist(np.array(error_value) * 100 ,bins=30)
                 plt.title(f"Erreur de reconstruction de {value}")
+                plt.xlabel("Erreur (%)")
+                plt.ylabel("Nombre d'échantillons")
                 plt.savefig(self.res_folder / f"hist_error_{value}.png")
                 plt.close()            
 
@@ -168,6 +209,8 @@ class Diagnostics():
             plt.figure()            
             plt.hist(np.array(error) * 100 ,bins=30)
             plt.title("Erreur de reconstruction du laser")
+            plt.xlabel("Erreur (%)")
+            plt.ylabel("Nombre d'échantillons")
             plt.savefig(self.res_folder / "hist_error_laser.png")
             plt.close()
 
@@ -180,6 +223,8 @@ class Diagnostics():
             plt.figure()
             plt.hist(np.array(gain_errors) * 100 ,bins=30)
             plt.title("Erreur de reconstruction du gain")
+            plt.xlabel("Erreur (%)")
+            plt.ylabel("Nombre d'échantillons")
             plt.savefig(self.res_folder / "hist_error_gain.png")
             plt.close()
         
@@ -281,22 +326,56 @@ class Diagnostics():
             plt.close()
         
         elif self.config["DataType"] == "COILS-MULTI":
-            index_max = np.argmax(np.array(error_profile))
-            index_min = np.argmin(np.array(error_profile))
 
-            plt.figure()
-            plt.plot(predicted_profile[index_max], label=f"Reconstruction, cutoff = {predicted_values[0][index_max]} ", c = 'r')
-            plt.plot(profile[index_max], label=f"True, cutoff = {true_values[0][index_max]} ", c = 'g')
-            plt.legend()
-            plt.savefig(self.res_folder / "max_error_pas.png")
-            plt.close()
+            if self.config["profile_types"] == 2:
+                index_max = np.argmax(np.array(error_profile_pitch))
+                index_min = np.argmin(np.array(error_profile_pitch))
+                index_max_radius = np.argmax(np.array(error_profile_radius))
+                index_min_radius = np.argmin(np.array(error_profile_radius))
+                plt.figure()
+                plt.plot(predicted_profile_pitch[index_max], label=f"Reconstruction, cutoff = {predicted_values[0][index_max]} ", c = 'r')
+                plt.plot(profile_pitch[index_max], label=f"True, cutoff = {true_values[0][index_max]} ", c = 'g')
+                plt.legend()
+                plt.savefig(self.res_folder / "max_error_pitch.png")
+                plt.close()
 
-            plt.figure()
-            plt.plot(predicted_profile[index_min], label=f"Reconstruction, cutoff = {predicted_values[0][index_min]} ", c = 'r')
-            plt.plot(profile[index_min], label=f"True, cutoff = {true_values[0][index_min]} ", c = 'g')
-            plt.legend()
-            plt.savefig(self.res_folder / "min_error_pas.png")
-            plt.close()
+                plt.figure()
+                plt.plot(predicted_profile_pitch[index_min], label=f"Reconstruction, cutoff = {predicted_values[1][index_max]} ", c = 'r')
+                plt.plot(profile_pitch[index_max], label=f"True, cutoff = {true_values[1][index_max]} ", c = 'g')
+                plt.legend()
+                plt.savefig(self.res_folder / "min_error_pitch.png")
+                plt.close()
+
+                plt.figure()
+                plt.plot(predicted_profile_radius[index_min_radius], label=f"Reconstruction, cutoff = {predicted_values[0][index_min]} ", c = 'r')
+                plt.plot(profile_radius[index_min], label=f"True, cutoff = {true_values[0][index_min]} ", c = 'g')
+                plt.legend()
+                plt.savefig(self.res_folder / "min_error_radius.png")
+                plt.close()
+
+                plt.figure()
+                plt.plot(predicted_profile_radius[index_max_radius], label=f"Reconstruction, cutoff = {predicted_values[1][index_min]} ", c = 'r')
+                plt.plot(profile_radius[index_min], label=f"True, cutoff = {true_values[1][index_min]} ", c = 'g')
+                plt.legend()
+                plt.savefig(self.res_folder / "min_error_radius.png")
+                plt.close()
+            
+            else:
+                index_max = np.argmax(np.array(error_profile))
+                index_min = np.argmin(np.array(error_profile))
+                plt.figure()
+                plt.plot(predicted_profile[index_max], label=f"Reconstruction, cutoff = {predicted_values[0][index_max]} ", c = 'r')
+                plt.plot(profile[index_max], label=f"True, cutoff = {true_values[0][index_max]} ", c = 'g')
+                plt.legend()
+                plt.savefig(self.res_folder / "max_error_pas.png")
+                plt.close()
+
+                plt.figure()
+                plt.plot(predicted_profile[index_min], label=f"Reconstruction, cutoff = {predicted_values[0][index_min]} ", c = 'r')
+                plt.plot(profile[index_min], label=f"True, cutoff = {true_values[0][index_min]} ", c = 'g')
+                plt.legend()
+                plt.savefig(self.res_folder / "min_error_pas.png")
+                plt.close()
 
             for i, value in enumerate(values):
                 index_max = np.argmax(np.array(error_values[i]))
