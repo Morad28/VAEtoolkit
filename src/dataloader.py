@@ -6,10 +6,30 @@ import numpy as np
 
 class DataLoader:
     """
-    Abstract class for loading and preprocessing data.
-    
+    Abstract base class for loading and preprocessing data for Variational Autoencoder (VAE) training.
+
+    This class provides the framework for data loading, preprocessing, and conversion to TensorFlow datasets.
+    Concrete implementations should override the abstract methods for specific data types.
+
+    Attributes:
+        config (dict): Configuration dictionary containing dataset and training parameters.
+        dataset_path (str): Path to the dataset file.
+        result_folder (str): Path to the folder containing trained model results (for visualization).
+        dataset (dict): Loaded dataset in dictionary format.
+        model (dict): Loaded model components (encoder, decoder, etc.).
+        tf_dataset (dict): Processed data in TensorFlow dataset format.
+        latent_space (np.array): Latent space representation of the data.
+        vae_norm (float): Normalization factor for VAE input data.
     """
+    
     def __init__(self, config, result_folder=None):
+        """Initialize the DataLoader with configuration and optional result folder.
+
+        Args:
+            config (dict): Configuration dictionary containing dataset and training parameters.
+            result_folder (str, optional): Path to folder containing trained model results. 
+                Defaults to None for training mode.
+        """
         self.config = config
         self.dataset_path = config["dataset_path"]
         self.result_folder = result_folder
@@ -23,30 +43,53 @@ class DataLoader:
             self.model = self._load_model()
 
     def _load_data(self) -> dict:
-        """
-        Load dataset.
+        """Load dataset from source.
+        
+        Returns:
+            dict: Dictionary containing the loaded dataset.
+            
+        Raises:
+            NotImplementedError: Must be implemented by concrete subclasses.
         """
         raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
     
     def _load_model(self) -> dict:
-        """
-        Load model. 
+        """Load trained model components.
+        
+        Returns:
+            dict: Dictionary containing model components (encoder, decoder, etc.).
+            
+        Raises:
+            NotImplementedError: Must be implemented by concrete subclasses.
         """
         raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
 
     def get_x_y(self):
-        """Get x data and y data (gain for FCI, labels, ...)
+        """Get input features and target values/labels.
+        
+        Returns:
+            tuple: (x, y) where x is the input features and y is the target values/labels.
+            
+        Raises:
+            NotImplementedError: Must be implemented by concrete subclasses.
         """
         raise NotImplementedError("This is an abstract class. Please use a concrete implementation.")
     
     def preprocessing(self):
-        """preprocessing of data. Normalization or other stuff.
+        """Preprocess the loaded data (normalization, filtering, etc.).
+        
+        This base implementation does nothing. Subclasses should override for specific preprocessing.
         """
         pass
     
     def pipeline(self):
-        """Apply preprocessing and transform dataset to tensorflow dataset. 
-        Stores dataset in self.tf_dataset for vae training.
+        """Apply preprocessing and transform dataset to TensorFlow dataset format.
+        
+        Stores processed dataset in self.tf_dataset with keys:
+        - "train_x": training features
+        - "val_x": validation features
+        - "train_y": training targets (if split < 1)
+        - "val_y": validation targets (if split < 1)
         """
         batch_size      = self.config.get("batch_size", 128)
         shuffle         = self.config.get("shuffle", True)
@@ -65,29 +108,42 @@ class DataLoader:
 
             
     def get_data(self):
-        """Get data.
+        """Get the loaded dataset.
+
+        Returns:
+            dict: The loaded dataset dictionary.
         """
         return self.dataset
     
     def get_tf_dataset(self):
+        """Get the processed TensorFlow dataset.
+        
+        Returns:
+            dict: Dictionary containing TensorFlow datasets for training and validation.
+        """
         return self.tf_dataset
     
     def get_model(self):
+        """Get the loaded model components.
+        
+        Returns:
+            dict: Dictionary containing model components (encoder, decoder, etc.).
+        """
         return self.model
     
     
     def to_dataset(self, batch_size = 128, shuffle=True, split=0.8, dataset = None):
-        """ Shuffle, split, and convert to tf.data.Dataset object.
+        """Convert data to TensorFlow Dataset object with optional shuffling and splitting.
         
         Args:
-            data: A single array or a tuple (x, y) where x is the features and y is the labels.
-            batch_size: The batch size for the dataset.
-            shuffle: Whether to shuffle the data before splitting.
-            split: The proportion of the dataset to use for training (default is 0.8).
-        
+            batch_size (int, optional): Batch size for the dataset. Defaults to 128.
+            shuffle (bool, optional): Whether to shuffle the data. Defaults to True.
+            split (float, optional): Proportion of data to use for training (0-1). Defaults to 0.8.
+            dataset (tf.data.Dataset, optional): Existing dataset to process. If None, uses get_x_y().
+            
         Returns:
-            train_dataset: A tf.data.Dataset object for training.
-            test_dataset: A tf.data.Dataset object for testing.
+            tuple: (train_dataset, test_dataset) TensorFlow Dataset objects.
+                   If split=0, test_dataset will be None.
         """
         
         if dataset is None:
@@ -118,6 +174,14 @@ class DataLoader:
             
     
     def to_tensorflow_dataset(self,data):
+        """Convert numpy arrays to TensorFlow Dataset.
+        
+        Args:
+            data: Either a tuple (x, y) of features and labels, or a single array of features.
+            
+        Returns:
+            tf.data.Dataset: The converted TensorFlow Dataset.
+        """
         if isinstance(data, tuple):
             x, y = data
             dataset = tf.data.Dataset.from_tensor_slices((x, y))
@@ -129,16 +193,33 @@ class DataLoader:
 
 class DataLoaderFCI(DataLoader):
     """
-    1D data loader to load FCI data from .npy file 
+    Data loader for 1D FCI (Fusion Confinement Index) data from .npy files.
+    
+    Inherits from DataLoader and implements specific methods for FCI data handling.
+    
+    Attributes:
+        _preprocessed (bool): Flag indicating if data has been preprocessed.
+        gain_norm (dict): Dictionary containing normalization factors for gain values.
+        vae_norm (float): Normalization factor for VAE input data.
     """
     
     def __init__(self, config, result_folder=None):
+        """Initialize the FCI DataLoader.
+        
+        Args:
+            config (dict): Configuration dictionary.
+            result_folder (str, optional): Path to folder containing trained model results.
+        """
         self._preprocessed = False
         self.gain_norm = {}
         self.vae_norm = 1.
         super().__init__(config, result_folder)
         
     def preprocessing(self):
+        """Apply preprocessing steps to FCI data.
+        
+        Includes optional filtering and normalization.
+        """
         filter          = self.config.get("filter", None)
         if filter is not None: self.apply_mask(filter)   
         if not self._preprocessed:
@@ -147,17 +228,21 @@ class DataLoaderFCI(DataLoader):
         
         
     def get_x_y(self, values = 'gain'):
+        """Get input features and specified target values.
+        
+        Args:
+            values (str, optional): Key specifying which target values to return. Defaults to 'gain'.
+            
+        Returns:
+            tuple: (x, y) where x is the input features and y is the target values.
+        """
         x = self.dataset['data']
         y = self.dataset['values'][values]
 
         return(x,y)
         
     def _normalize_data(self):
-        """Normalize data to be in the range [0, 1].
-        
-        Returns:
-            normalized_data: The normalized data.
-        """
+        """Normalize data to be in the range [0, 1] for both input features and target values."""
         # Normalize data to be in the range [-1, 1]
         self.dataset['data'] = np.array(self.dataset['data'])
         self.dataset['values']['gain'] = np.array(self.dataset['values']['gain'])
@@ -168,6 +253,14 @@ class DataLoaderFCI(DataLoader):
             self.dataset['values'][key] = np.array(self.dataset['values'][key]) / (np.max(self.dataset['values'][key]))
         
     def apply_mask(self,filter):
+        """Apply filter mask to dataset based on threshold values.
+        
+        Args:
+            filter (dict): Dictionary with key specifying which value to filter on and value as threshold.
+            
+        Raises:
+            ValueError: If no data remains after filtering.
+        """
         key = list(filter.keys())[0]
         gain_val = np.array(self.dataset['values'][key])
         mask = gain_val >= filter[key]
@@ -183,12 +276,20 @@ class DataLoaderFCI(DataLoader):
 
 
     def get_shape(self):
+        """Get the shape of the input data.
+        
+        Returns:
+            tuple: Shape of the input data with channel dimension added if needed.
+        """
         if len(self.dataset['data'].shape[1:]) == 1:
             return (self.dataset['data'].shape[1], 1)
         return self.dataset['data'].shape[1:]
 
     def _load_data(self) -> dict:
-        """Load dataset from .npy file.
+        """Load FCI dataset from .npy file and compute normalization factors.
+        
+        Returns:
+            dict: Loaded dataset dictionary.
         """
 
         loaded_dataset = np.load(self.dataset_path, allow_pickle=True).item()
@@ -207,12 +308,14 @@ class DataLoaderFCI(DataLoader):
         return(loaded_dataset)
     
     def _load_model(self) -> dict:
-        """Load model.
-        returns:
-            encoder (tf.keras.models): Encoder model.
-            decoder (tf.keras.models): Decoder model.
-            latent_gain (dict(str, tf.keras.models)): Dictionary of the gain ANNs for prediction.
-            latent_space (np.array): Latent space.
+        """Load trained VAE model components from result folder.
+        
+        Returns:
+            dict: Dictionary containing:
+                - "encoder": Encoder model
+                - "decoder": Decoder model
+                - "latent_space": Latent space representation
+                - "latent_gain": Dictionary of trained gain prediction models
         """
         def below_10_percent(y_true, y_pred):
             absolute_error = tf.abs(y_true - y_pred)
