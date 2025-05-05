@@ -60,12 +60,17 @@ class PostprocessingBase(ABC):
     def _initialize_model_components(self):
         """Initialize model-related components."""
         self.latent_space = self.data_loader.model["latent_space"]
-        self.encoder = self.data_loader.model["encoder"]
         if "decoder" in self.data_loader.model:
             self.decoder = self.data_loader.model["decoder"]
         else:
             self.decoder_cnn = self.data_loader.model["decoder_cnn"]
             self.decoder_mlp = self.data_loader.model["decoder_mlp"]
+        if "encoder" in self.data_loader.model:
+            self.encoder = self.data_loader.model["encoder"]
+        else:
+            self.encoder_cnn = self.data_loader.model["encoder_cnn"]
+            self.encoder_mlp = self.data_loader.model["encoder_mlp"]
+            self.encoder_latent = self.data_loader.model["encoder_latent"]
         self.vae_norm = self.data_loader.vae_norm
         self.res_folder = self.data_loader.result_folder
         self.dim = self.latent_space.shape[1]
@@ -1193,7 +1198,7 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         else:
             dim = self.dim
 
-        if self.config["Model"]["vae"] == "COILS-MULTI-OUT":
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
             prediction_profile = self.decoder_cnn.predict(latent_point,verbose=0)[0]
             laser = prediction_profile
             vals = []
@@ -1280,7 +1285,7 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         
         optimization_val = self.values[0]
         
-        if self.config["Model"]["vae"] == "COILS-MULTI-OUT":
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
             predictions = self.decoder_mlp.predict(random_samples, verbose=0) / self.gain_weight * self.vae_norm[optimization_val]["std"] + self.vae_norm[optimization_val]["mean"]
         else:
             predictions = self.decoder.predict(random_samples, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[optimization_val]["std"] + self.vae_norm[optimization_val]["mean"]
@@ -1475,7 +1480,10 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         n = self._N.get()  # Get the resolution for the mapping
         dataset_batched = tf.data.Dataset.from_tensor_slices(dataset).batch(256)
         heatmap_value = self.config["heatmap"]
-        values = self.decoder.predict(dataset_batched, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[heatmap_value]["std"] + self.vae_norm[heatmap_value]["mean"]
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
+            values = self.decoder_mlp.predict(dataset_batched, verbose=0) / self.gain_weight * self.vae_norm[heatmap_value]["std"] + self.vae_norm[heatmap_value]["mean"]
+        else:
+            values = self.decoder.predict(dataset_batched, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[heatmap_value]["std"] + self.vae_norm[heatmap_value]["mean"]
         values = values.reshape((n, n))
         return (values)
         

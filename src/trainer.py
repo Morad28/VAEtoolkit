@@ -46,15 +46,18 @@ class Trainer(ABC):
         folder_name = f"std_{name}_{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}_{model}"
         if model == "2D-MNIST-MoG":
             folder_name += f"_gaussians_{num_components}"
-        if model == "1D-COILS-GAIN" or model == "COILS-MULTI" or model == "COILS-MULTI-OUT":
+        if model == "1D-COILS-GAIN" or model == "COILS-MULTI" or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO":
             gain_weight = self.config["gain_weight"]
             folder_name += f"_gw_{gain_weight}"
-            if self.config["sep_loss"] or model == "COILS-MULTI-OUT":
+            if self.config["sep_loss"] or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO":
                 gain_loss = self.config["gain_loss"]
                 folder_name += f"_gl_{gain_loss}"
                 r_loss = self.config["r_loss"]
                 folder_name += f"_rl_{r_loss}"
-        if model == "COILS-MULTI" or model == "COILS-MULTI-OUT":
+            if model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO":
+                if self.config["predict_z_mean"]:
+                    folder_name += "_mean"
+        if model == "COILS-MULTI" or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO":
             values = self.config["values"]
             for value in values:
                 folder_name += f"_{value}"
@@ -74,9 +77,15 @@ class Trainer(ABC):
         if len(models["vae"]) == 3:
             autoencoder, encoder, decoder = models["vae"]
             multi_decoder = False
+            multi_encoder = False
         elif len(models["vae"]) == 4:
             autoencoder, encoder, decoder_cnn, decoder_mlp = models["vae"]
             multi_decoder = True
+            multi_encoder = False
+        elif len(models["vae"]) == 6:
+            autoencoder, encoder_cnn, encoder_mlp, enocder_latent, decoder_cnn, decoder_mlp = models["vae"]
+            multi_decoder = True
+            multi_encoder = True
 
         
         '''lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
@@ -117,14 +126,23 @@ class Trainer(ABC):
         self.history["vae"] = history
 
         autoencoder.save(self.res_folder / "model.keras")
-        encoder.save(self.res_folder / 'encoder_model.keras')
-        if multi_decoder:
-            decoder_cnn.save(self.res_folder / 'decoder_cnn_model.keras')
-            decoder_mlp.save(self.res_folder / 'decoder_mlp_model.keras')
-            self.models["vae"] = (autoencoder, encoder, decoder_cnn, decoder_mlp)
+        if multi_encoder:
+            encoder_cnn.save(self.res_folder / 'encoder_cnn_model.keras')
+            encoder_mlp.save(self.res_folder / 'encoder_mlp_model.keras')
+            enocder_latent.save(self.res_folder / 'encoder_latent_model.keras')
+            if multi_decoder:
+                decoder_cnn.save(self.res_folder / 'decoder_cnn_model.keras')
+                decoder_mlp.save(self.res_folder / 'decoder_mlp_model.keras')
+                self.models["vae"] = (autoencoder, encoder_cnn, encoder_mlp, enocder_latent, decoder_cnn, decoder_mlp)
         else:
-            decoder.save(self.res_folder / 'decoder_model.keras')
-            self.models["vae"] = (autoencoder, encoder, decoder)
+            encoder.save(self.res_folder / 'encoder_model.keras')
+            if multi_decoder:
+                decoder_cnn.save(self.res_folder / 'decoder_cnn_model.keras')
+                decoder_mlp.save(self.res_folder / 'decoder_mlp_model.keras')
+                self.models["vae"] = (autoencoder, encoder, decoder_cnn, decoder_mlp)
+            else:
+                decoder.save(self.res_folder / 'decoder_model.keras')
+                self.models["vae"] = (autoencoder, encoder, decoder)
         
         return history
     
@@ -369,11 +387,46 @@ class TrainerGain(Trainer):
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
-        _, encoder, *decoder = models["vae"]
-        
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
+            _, encoder_cnn, encoder_mlp, encoder_latent, decoder_cnn, decoder_mlp = models["vae"]
+            
+            # Combine the three encoders
+            cnn_output = encoder_cnn.output
+            mlp_output = encoder_mlp.output
+            concatenated = tf.keras.layers.Concatenate()([cnn_output, mlp_output])
+            z_mean, z_log_var, z = encoder_latent(concatenated)
+            encoder = tf.keras.Model(
+                inputs=[encoder_cnn.input, encoder_mlp.input],
+                outputs=[z_mean, z_log_var, z]
+            )
+        else:
+            _, encoder, *decoder = models["vae"]
+
         # Saving latent space
         batch_size = 256
         dataset_batched, _ = self.data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
-        z = encoder.predict(dataset_batched)[-1]
-        np.savetxt(self.res_folder / 'latent_z.txt',z)
+
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
+            # Initialize lists to store profile and vals
+            profiles = []
+            vals = []
+            
+            # Iterate over the dataset to extract profile and vals
+            len_values = len(self.config["values"])
+            for batch in dataset_batched:
+                # Unpack the batch tuple (assuming the first element is the input tensor)
+                inputs = batch[0]  # Adjust this if your dataset structure is different
+                profiles.append(inputs[:, :-len_values])
+                vals.append(inputs[:, -len_values:])
+            
+            # Convert lists to NumPy arrays
+            profile = np.concatenate(profiles, axis=0)
+            vals = np.concatenate(vals, axis=0)
+            
+            # Use the combined encoder for prediction
+            z_mean, z_log_var, z = encoder.predict([profile, vals])
+        else:
+            z = encoder.predict(dataset_batched)[-1]
+
+        np.savetxt(self.res_folder / 'latent_z.txt', z)
         return history

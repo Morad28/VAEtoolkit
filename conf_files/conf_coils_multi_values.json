@@ -1,7 +1,7 @@
 {
     "DataType" : "COILS-MULTI",
     "Model" : {
-        "vae" : "COILS-MULTI-OUT"
+        "vae" : "COILS-MULTI-OUT-DUO"
     },
     "dataset_path": "datasets/dataset6000_addon.npy",
     "results_dir": "testing_coils_multi_6000/",
@@ -17,17 +17,18 @@
     "r_loss" : 1,
     "gain_loss" : 1,
     "physical_penalty_weight" : 0,
-    "gain_weight" : 1,
+    "gain_weight" : 15,
     "training" : [],
-    "values" : ["cutoff"],
+    "values" : ["e99"],
+    "predict_z_mean" : 0,
     "num_components" : 1,
     "profile_types" : 1,
-    "heatmap": "cutoff",
+    "heatmap": "e99",
     "reprise" : {
         "gain_only" : 0,
         "result_folder" : "./testing_coils_multi_6000/"
     },
     "filter" : {
-        "cutoff" : 2e-6
+        "e99" : 2e-6
     }
 }

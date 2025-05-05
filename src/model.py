@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 from keras import layers, losses, Model
 from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTranspose, MaxPooling2D, Flatten, Reshape, MaxPooling1D, UpSampling1D, Concatenate
-from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG, VAE_multi_decoder
+from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG, VAE_multi_decoder, VAE_multi_decoder_encoder
 
 
 class ModelSelector:
@@ -34,6 +34,10 @@ class ModelSelector:
                                                      dataloader=dataloader, physical_penalty_weight=physical_penalty_weight)
         if self.vae == 'COILS-MULTI-OUT':
             s["vae"] = self._get_1d_vae_coils_gain_multi_out(input_shape=input_shape, latent_dim=latent_dim,
+                                                       r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, config=config,
+                                                     dataloader=dataloader, physical_penalty_weight=physical_penalty_weight)
+        if self.vae == 'COILS-MULTI-OUT-DUO':
+            s["vae"] = self._get_1d_vae_coils_gain_multi_out_duo(input_shape=input_shape, latent_dim=latent_dim,
                                                        r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, config=config,
                                                      dataloader=dataloader, physical_penalty_weight=physical_penalty_weight)
         if self.gain == '12MLP':
@@ -531,3 +535,92 @@ class ModelSelector:
         autoencoder = VAE_multi_decoder(encoder, [decoder_cnn, decoder_mlp], [r_loss,k_loss,gain_loss], config=config, min_value = minimum_value, physical_penalty_weight=physical_penalty_weight)
 
         return autoencoder, encoder, decoder_cnn, decoder_mlp
+    
+
+    def _get_1d_vae_coils_gain_multi_out_duo(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.,
+                                physical_penalty_weight=1, config=None, dataloader=None):
+        """For training on 1D coils with multiple values with the values in the VAE, but not using the CNN layers, with reconstruction
+
+        Args:
+            input_shape (int, optional): _description_. Defaults to 41.
+            latent_dim (int, optional): _description_. Defaults to 5.
+            r_loss (_type_, optional): _description_. Defaults to 0..
+            k_loss (_type_, optional): _description_. Defaults to 1..
+            gain_loss (_type_, optional): _description_. Defaults to 0..
+
+        Returns:
+            Model: autoencoder
+        """
+        inputs = Input(shape=input_shape)
+        len_values = len(config["values"])
+
+        profile = inputs[:,:-len_values,:]
+        vals = inputs[:,-len_values:,:]
+        vals = Flatten()(vals)
+
+        out_shape = input_shape[0] - len_values
+        
+        # Encoder CNN
+        x = Conv1D(32, 3, activation='leaky_relu', padding='same', strides=1)(profile)
+        x = MaxPooling1D(pool_size=2)(x)  # Output: (20, 32)
+        x = Conv1D(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = MaxPooling1D(pool_size=2)(x)  # Output: (10, 64)
+        x = Conv1D(128, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = Flatten()(x)  # Output: (1280,)
+        encoder_cnn = keras.Model(profile, x, name="encoder_cnn")
+        encoder_cnn.compile()
+
+        # Encoder MLP (values)
+        x2 = Dense(64, activation='leaky_relu')(vals)
+        x2 = Dense(128, activation='leaky_relu')(x2)
+        x2 = Flatten()(x2)  # Flatten the values
+        encoder_mlp = keras.Model(vals, x2, name="encoder_mlp")
+        encoder_mlp.compile()
+
+        input_latent = Concatenate()([x,x2])
+        concat = Dense(128, activation='leaky_relu')(input_latent)  # Add a dense layer before the latent space
+        z_mean = layers.Dense(latent_dim, name="z_mean")(concat)
+        z_log_var = layers.Dense(latent_dim, name="z_log_var")(concat)
+        z = Sampling()([z_mean, z_log_var])
+        encoder_latent = keras.Model(input_latent, [z_mean, z_log_var, z], name="encoder_latent")
+        encoder_latent.compile()
+
+        # Decoder CNN (profile)
+        latent_inputs = Input(shape=(latent_dim,))
+        x = Dense(10 * 128, activation='leaky_relu')(latent_inputs)  # Match flattened size
+        # remove the values from the output
+        x = Reshape((10, 128))(x)  # Output: (10, 128)
+        x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = UpSampling1D(size=2)(x)  # Output: (20, 64)
+        x = Conv1DTranspose(32, 3, activation='leaky_relu', padding='same', strides=1)(x)
+        x = UpSampling1D(size=2)(x)  # Output: (40, 32)
+        x = Conv1DTranspose(1, 3, activation='linear', padding='same', strides=1)(x)  # Output: (40, 1)
+        decoded = Reshape((out_shape,))(x)
+        # Concatenate the values to the output
+        decoder_cnn = tf.keras.Model(latent_inputs, decoded, name='decoder')
+        decoder_cnn.compile()
+
+        # Decoder MLP (values)
+        x2 = Dense(64, activation='leaky_relu')(latent_inputs)
+        x2 = Dense(128, activation='leaky_relu')(x2)
+        predictions = Dense(len_values, activation='linear')(x2)
+        predictions = Reshape((len_values,))(predictions)
+        decoder_mlp = tf.keras.Model(latent_inputs, predictions, name='decoder2')
+        decoder_mlp.compile()
+
+        print(encoder_cnn.summary())
+        print(encoder_mlp.summary())
+        print(encoder_latent.summary())
+        print(decoder_cnn.summary())
+        print(decoder_mlp.summary())
+        
+        std = dataloader.vae_norm["profile"]["std"]
+        mean = dataloader.vae_norm["profile"]["mean"]
+
+        minimum_value = config["min_value"] if config else 0.
+        # normalize to make it correspond to the data
+        minimum_value = minimum_value * std + mean
+
+        autoencoder = VAE_multi_decoder_encoder([encoder_cnn, encoder_mlp, encoder_latent], [decoder_cnn, decoder_mlp], [r_loss,k_loss,gain_loss], config=config, min_value = minimum_value, physical_penalty_weight=physical_penalty_weight)
+
+        return autoencoder, encoder_cnn, encoder_mlp, encoder_latent, decoder_cnn, decoder_mlp

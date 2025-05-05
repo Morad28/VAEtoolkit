@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt 
 from src.trainer import Trainer
 from src.dataloader import DataLoader
+import tensorflow as tf
 
 class Diagnostics():
     def __init__(self, config, trainer : Trainer):
@@ -52,15 +53,56 @@ class Diagnostics():
         elif len(self.trainer.models["vae"]) == 4:
             autoencoder, encoder, decoder_cnn, decoder_mlp =  self.trainer.models["vae"]
             cnn_mlp_diff = True
+        elif len(self.trainer.models["vae"]) == 6:
+            _, encoder_cnn, encoder_mlp, encoder_latent, decoder_cnn, decoder_mlp = self.trainer.models["vae"]
+            
+            # Combine the three encoders
+            cnn_output = encoder_cnn.output
+            mlp_output = encoder_mlp.output
+            concatenated = tf.keras.layers.Concatenate()([cnn_output, mlp_output])
+            z_mean, z_log_var, z = encoder_latent(concatenated)
+            encoder = tf.keras.Model(
+                inputs=[encoder_cnn.input, encoder_mlp.input],
+                outputs=[z_mean, z_log_var, z]
+            )
+
         batch_size = 256
         dataset_batched, _ = data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
-        z = encoder.predict(dataset_batched)[-1]
-        if cnn_mlp_diff:
+        
+        if len(self.trainer.models["vae"]) == 6:
+            # Initialize lists to store profile and vals
+            profiles = []
+            vals = []
+            len_values = len(self.config["values"])
+
+            # Iterate over the dataset to extract profile and vals
+            for batch in dataset_batched:
+                inputs = batch[0]  # Unpack the batch tuple (adjust if structure differs)
+                profiles.append(inputs[:, :-len_values])
+                vals.append(inputs[:, -len_values:])
+
+            # Convert lists to NumPy arrays
+            profile = np.concatenate(profiles, axis=0)
+            vals = np.concatenate(vals, axis=0)
+
+            # Use the encoder to predict latent space
+            z = encoder.predict([profile, vals])[-1]
+
+            # Use the decoders to reconstruct the outputs
+            predicted_profile = decoder_cnn.predict(z)
+            predicted_gain = decoder_mlp.predict(z)
+            tilde_laser = np.concatenate((predicted_profile, predicted_gain), axis=1)
+        elif cnn_mlp_diff:
+            # Use the encoder to predict latent space
+            z = encoder.predict(dataset_batched)[-1]
             predicted_profile = decoder_cnn.predict(z)
             predicted_gain = decoder_mlp.predict(z)
             tilde_laser = np.concatenate((predicted_profile, predicted_gain), axis=1)
         else:
+            z = encoder.predict(dataset_batched)[-1]
             tilde_laser = decoder.predict(z)
+
+
         data, label = data_loader.get_x_y()
         if self.config["DataType"] == "COILS-MULTI":
             values = self.config["values"]

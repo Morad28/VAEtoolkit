@@ -658,24 +658,42 @@ class DataLoaderCoilsMulti(DataLoader):
             encoder (tf.keras.models): Encoder model.
             decoder (tf.keras.models): Decoder model.
             latent_space (np.array): Latent space.
-        """    
-        encoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-encoder.keras"),
+        """
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
+            encoder_mlp = tf.keras.models.load_model(os.path.join( self.result_folder, "encoder_mlp_model.keras"),
+                                        custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+            encoder_cnn = tf.keras.models.load_model(os.path.join( self.result_folder, "encoder_cnn_model.keras"),
+                                        custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+            encoder_latent = tf.keras.models.load_model(os.path.join( self.result_folder, "encoder_latent_model.keras"),
+                                        custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
+        
+        else:
+            encoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-encoder.keras"),
                                         custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
 
-        if self.config["Model"]["vae"] == "COILS-MULTI-OUT":
-            decoder0 = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder-0.keras"),
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
+            decoder0 = tf.keras.models.load_model(os.path.join( self.result_folder, "decoder_cnn_model.keras"),
                                             custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
-            decoder1 = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder-1.keras"),
+            decoder1 = tf.keras.models.load_model(os.path.join( self.result_folder, "decoder_mlp_model.keras"),
                                             custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
 
             latent_space = np.loadtxt(os.path.join(self.result_folder,"latent_z.txt"))
-            
-            model = {
-                "encoder": encoder, 
-                "decoder_cnn": decoder0,
-                "decoder_mlp": decoder1,
-                "latent_space": latent_space,
-            }
+            if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
+                model = {
+                    "encoder_mlp": encoder_mlp,
+                    "encoder_cnn": encoder_cnn,
+                    "encoder_latent": encoder_latent,
+                    "decoder_cnn": decoder0,
+                    "decoder_mlp": decoder1,
+                    "latent_space": latent_space,
+                }
+            else:
+                model = {
+                    "encoder": encoder, 
+                    "decoder_cnn": decoder0,
+                    "decoder_mlp": decoder1,
+                    "latent_space": latent_space,
+                }
         else:
             decoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-decoder.keras"),
                                             custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
