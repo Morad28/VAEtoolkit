@@ -192,7 +192,7 @@ class Diagnostics():
             
             if self.config["profile_types"] == 2:
                 profile_pitch = profile[:,:40]
-                profile_radius = profile[:,40:] 
+                profile_radius = profile[:,40:]
                 predicted_profile_pitch = predicted_profile[:,:40]
                 predicted_profile_radius = predicted_profile[:,40:]
                 error_profile_pitch = []

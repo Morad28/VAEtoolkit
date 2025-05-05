@@ -585,11 +585,10 @@ class DataLoaderCoilsMulti(DataLoader):
         # Z-scoring normalization
         length_values = len(self.dataset['values'].keys())
 
-
         self.dataset['data'][:,:-length_values] = (self.dataset['data'][:,:-length_values] - self.vae_norm["profile"]["mean"]) / self.vae_norm["profile"]["std"]
-        for i, key in enumerate(self.dataset['values'].keys()):
+        for i, key in enumerate(self.values):
             self.dataset['data'][:,-length_values+i] = (self.dataset['data'][:,-length_values+i] - self.vae_norm[key]["mean"]) / self.vae_norm[key]["std"]
-
+    
         values_weight = self.config["gain_weight"]
         self.dataset['data'][:, -length_values:] = self.dataset['data'][:, -length_values:] * values_weight
 
