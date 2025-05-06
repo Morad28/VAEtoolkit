@@ -203,7 +203,7 @@ class PostprocessingBase(ABC):
                 sc = self.ax_main.scatter(self.latent_space[:, self.x_axis_var.get()], self.latent_space[:, self.y_axis_var.get()], c = gg)
                 self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()}")
                 self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()}")
-        
+
         '''margin = 50  # Adjust this value to control the margin
         self.ax_main.set_xlim(-3 - margin, 3 + margin)
         self.ax_main.set_ylim(-3 - margin, 3 + margin)'''
@@ -212,6 +212,9 @@ class PostprocessingBase(ABC):
             self.scatter_cb.update_normal(sc)
         else:
             self.scatter_cb = self.fig_main.colorbar(sc, ax=self.ax_main)
+        
+        self.scatter_cb.set_label(f"{self.config['heatmap']} (MeV)")
+
         self.canvas_main.draw()
 
     def on_click(self, event):
@@ -1528,6 +1531,7 @@ class PostprocessingCoilsMulti(PostprocessingBase):
             self.ax_mapping_all_cbar.update_normal(im)  # Update the existing colorbar
         else:
             self.ax_mapping_all_cbar = plt.colorbar(im, ax=self.ax_mapping_all.ravel().tolist())  # Create a new colorbar
+
 
         # Redraw the canvas
         self.canvas_mapping_all.draw()

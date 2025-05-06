@@ -61,6 +61,8 @@ class Trainer(ABC):
             values = self.config["values"]
             for value in values:
                 folder_name += f"_{value}"
+        for key in self.config["filter"]:
+            folder_name += f"_{key}min_{self.config['filter'][key]}"
         folder_name += f"_phys_{physical_penalty_weight}"
         folder_name += f"_epochs_{epoch_vae}"
         self.res_folder = results_path / folder_name

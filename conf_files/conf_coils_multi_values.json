@@ -1,15 +1,15 @@
 {
     "DataType" : "COILS-MULTI",
     "Model" : {
-        "vae" : "COILS-MULTI-OUT-DUO"
+        "vae" : "COILS-MULTI"
     },
     "dataset_path": "datasets/dataset6000_addon.npy",
-    "results_dir": "testing_coils_multi_6000/",
+    "results_dir": "testing_coils_multi_6000_good/",
     "name": "dyn-shell",
     "sep_loss" : 0,
     "epoch_vae": 2000,
     "epoch_rna": 1,
-    "latent_dim": 10,
+    "latent_dim": 5,
     "batch_size_vae": 256,
     "batch_size_rna": 128,
     "min_value": 0.15,
@@ -19,16 +19,16 @@
     "physical_penalty_weight" : 0,
     "gain_weight" : 10,
     "training" : [],
-    "values" : ["e99", "qsup"],
+    "values" : ["e99"],
     "predict_z_mean" : 0,
     "num_components" : 1,
     "profile_types" : 1,
     "heatmap": "e99",
     "reprise" : {
         "gain_only" : 0,
-        "result_folder" : "./testing_coils_multi_6000/"
+        "result_folder" : "./testing_coils_multi_6000_good/"
     },
     "filter" : {
-        "e99" : 2e-6
+        "e99" : 20
     }
 }

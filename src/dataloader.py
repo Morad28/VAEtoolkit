@@ -602,11 +602,13 @@ class DataLoaderCoilsMulti(DataLoader):
             mask = val_to_mask >= filter[key]
         
             self.dataset['values'][key] = np.array(self.dataset['values'][key])[mask]
+
+            length_dataset = len(self.dataset['data'])
             
             self.dataset['data'] = np.array(self.dataset['data'])[mask]
             self.dataset['name'] = np.array(self.dataset['name'])[mask]
 
-            print("\nNumbers of samples that will get filtered out: ", len(self.dataset['data']) - len(mask[mask == True]))
+            print("\nNumbers of samples that will get filtered out: ", length_dataset - len(mask[mask == True]))
             print("\nNumbers of samples that will be used: ", len(mask[mask == True]))
         
         if self.dataset['data'].shape[0] == 0:
