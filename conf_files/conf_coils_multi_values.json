@@ -1,7 +1,7 @@
 {
     "DataType" : "COILS-MULTI",
     "Model" : {
-        "vae" : "COILS-MULTI"
+        "vae" : "COILS-MULTI-OUT-DUO"
     },
     "dataset_path": "datasets/dataset6000_addon.npy",
     "results_dir": "testing_coils_multi_6000_good/",
@@ -29,6 +29,6 @@
         "result_folder" : "./testing_coils_multi_6000_good/"
     },
     "filter" : {
-        "e99" : 20
+        "e99" : 1e-6
     }
 }
