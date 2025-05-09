@@ -65,6 +65,8 @@ class Trainer(ABC):
             folder_name += f"_{key}min_{self.config['filter'][key]}"
         folder_name += f"_phys_{physical_penalty_weight}"
         folder_name += f"_epochs_{epoch_vae}"
+        folder_name += f"_sep_loss_{self.config['sep_loss']}"
+        folder_name += f"_smoothing_{self.config['smooth']}"
         self.res_folder = results_path / folder_name
         os.makedirs(os.path.dirname(self.res_folder / 'conf.json'), exist_ok=True)
         self.config["dataset_path"] = os.path.abspath(self.config["dataset_path"])

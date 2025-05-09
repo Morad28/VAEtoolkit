@@ -12,3 +12,5 @@ vaetools.egg-info/
 build/
 pitch_profiles/second_database/
 pitch_profiles/modified_data_with_sinusoidal_variations/
+pitch_radius_test/
+pitch_radius_test_2400/

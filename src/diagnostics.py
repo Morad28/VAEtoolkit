@@ -191,10 +191,11 @@ class Diagnostics():
             
             
             if self.config["profile_types"] == 2:
-                profile_pitch = profile[:,:40]
-                profile_radius = profile[:,40:]
-                predicted_profile_pitch = predicted_profile[:,:40]
-                predicted_profile_radius = predicted_profile[:,40:]
+                length_profile = len(profile[1]) //2
+                profile_pitch = profile[:,:length_profile]
+                profile_radius = profile[:,length_profile:]
+                predicted_profile_pitch = predicted_profile[:,:length_profile]
+                predicted_profile_radius = predicted_profile[:,length_profile:]
                 error_profile_pitch = []
                 error_profile_radius = []
                 for i in range(len(data)):
@@ -205,14 +206,14 @@ class Diagnostics():
                 plt.title("Erreur de reconstruction du profil de pas")
                 plt.xlabel("Erreur (%)")
                 plt.ylabel("Nombre d'échantillons")
-                plt.savefig(self.res_folder / "hist_error_pas_pitch.png")
+                plt.savefig(self.res_folder / "hist_error_pitch.png")
                 plt.close()
                 plt.figure()
                 plt.hist(np.array(error_profile_radius) * 100 ,bins=30)
                 plt.title("Erreur de reconstruction du profil de pas")
                 plt.xlabel("Erreur (%)")
                 plt.ylabel("Nombre d'échantillons")
-                plt.savefig(self.res_folder / "hist_error_pas_radius.png")
+                plt.savefig(self.res_folder / "hist_error_radius.png")
                 plt.close()
             
             else:
@@ -370,34 +371,50 @@ class Diagnostics():
         elif self.config["DataType"] == "COILS-MULTI":
 
             if self.config["profile_types"] == 2:
+                length_profile = len(profile[1]) //2
                 index_max = np.argmax(np.array(error_profile_pitch))
                 index_min = np.argmin(np.array(error_profile_pitch))
                 index_max_radius = np.argmax(np.array(error_profile_radius))
                 index_min_radius = np.argmin(np.array(error_profile_radius))
+
+                profile_pitch = profile[:,:length_profile]
+                profile_radius = profile[:,length_profile:]
+                predicted_profile_pitch = predicted_profile[:,:length_profile]
+                predicted_profile_radius = predicted_profile[:,length_profile:]
+
+                """if self.config["smooth"]:
+                    # smooth the predicted profiles to ignore the noise
+                    predicted_profile_pitch = np.apply_along_axis(
+                        lambda x: np.convolve(x, np.ones(5)/5, mode='same'), axis=1, arr=predicted_profile_pitch
+                    )
+                    predicted_profile_radius = np.apply_along_axis(
+                        lambda x: np.convolve(x, np.ones(5)/5, mode='same'), axis=1, arr=predicted_profile_radius
+                    )"""
+
                 plt.figure()
-                plt.plot(predicted_profile_pitch[index_max], label=f"Reconstruction, cutoff = {predicted_values[0][index_max]} ", c = 'r')
-                plt.plot(profile_pitch[index_max], label=f"True, cutoff = {true_values[0][index_max]} ", c = 'g')
+                plt.plot(predicted_profile_pitch[index_max], label=f"Reconstruction, e99 = {predicted_values[0][index_max]} ", c = 'r')
+                plt.plot(profile_pitch[index_max], label=f"True, e99 = {true_values[0][index_max]} ", c = 'g')
                 plt.legend()
                 plt.savefig(self.res_folder / "max_error_pitch.png")
                 plt.close()
 
                 plt.figure()
-                plt.plot(predicted_profile_pitch[index_min], label=f"Reconstruction, cutoff = {predicted_values[1][index_max]} ", c = 'r')
-                plt.plot(profile_pitch[index_max], label=f"True, cutoff = {true_values[1][index_max]} ", c = 'g')
+                plt.plot(predicted_profile_pitch[index_min], label=f"Reconstruction, e99 = {predicted_values[0][index_max]} ", c = 'r')
+                plt.plot(profile_pitch[index_min], label=f"True, e99 = {true_values[0][index_max]} ", c = 'g')
                 plt.legend()
                 plt.savefig(self.res_folder / "min_error_pitch.png")
                 plt.close()
 
                 plt.figure()
-                plt.plot(predicted_profile_radius[index_min_radius], label=f"Reconstruction, cutoff = {predicted_values[0][index_min]} ", c = 'r')
-                plt.plot(profile_radius[index_min], label=f"True, cutoff = {true_values[0][index_min]} ", c = 'g')
+                plt.plot(predicted_profile_radius[index_max_radius], label=f"Reconstruction, e99 = {predicted_values[0][index_min]} ", c = 'r')
+                plt.plot(profile_radius[index_max_radius], label=f"True, e99 = {true_values[0][index_min]} ", c = 'g')
                 plt.legend()
-                plt.savefig(self.res_folder / "min_error_radius.png")
+                plt.savefig(self.res_folder / "max_error_radius.png")
                 plt.close()
 
                 plt.figure()
-                plt.plot(predicted_profile_radius[index_max_radius], label=f"Reconstruction, cutoff = {predicted_values[1][index_min]} ", c = 'r')
-                plt.plot(profile_radius[index_min], label=f"True, cutoff = {true_values[1][index_min]} ", c = 'g')
+                plt.plot(predicted_profile_radius[index_min_radius], label=f"Reconstruction, e99 = {predicted_values[0][index_min]} ", c = 'r')
+                plt.plot(profile_radius[index_min_radius], label=f"True, e99 = {true_values[0][index_min]} ", c = 'g')
                 plt.legend()
                 plt.savefig(self.res_folder / "min_error_radius.png")
                 plt.close()
@@ -406,14 +423,14 @@ class Diagnostics():
                 index_max = np.argmax(np.array(error_profile))
                 index_min = np.argmin(np.array(error_profile))
                 plt.figure()
-                plt.plot(predicted_profile[index_max], label=f"Reconstruction, cutoff = {predicted_values[0][index_max]} ", c = 'r')
+                plt.plot(predicted_profile[index_max], label=f"Reconstruction, e99 = {predicted_values[0][index_max]} ", c = 'r')
                 plt.plot(profile[index_max], label=f"True, cutoff = {true_values[0][index_max]} ", c = 'g')
                 plt.legend()
                 plt.savefig(self.res_folder / "max_error_pas.png")
                 plt.close()
 
                 plt.figure()
-                plt.plot(predicted_profile[index_min], label=f"Reconstruction, cutoff = {predicted_values[0][index_min]} ", c = 'r')
+                plt.plot(predicted_profile[index_min], label=f"Reconstruction, e99 = {predicted_values[0][index_min]} ", c = 'r')
                 plt.plot(profile[index_min], label=f"True, cutoff = {true_values[0][index_min]} ", c = 'g')
                 plt.legend()
                 plt.savefig(self.res_folder / "min_error_pas.png")
@@ -423,19 +440,53 @@ class Diagnostics():
                 index_max = np.argmax(np.array(error_values[i]))
                 index_min = np.argmin(np.array(error_values[i]))
 
-                plt.figure()
-                plt.plot(predicted_profile[index_max], label=f"Reconstruction, {value} = {predicted_values[i][index_max]} ", c = 'r')
-                plt.plot(profile[index_max], label=f"True, {value} = {true_values[i][index_max]} ", c = 'g')
-                plt.legend()
-                plt.savefig(self.res_folder / f"max_error_{value}.png")
-                plt.close()
+                if self.config["profile_types"] == 2:
+                    length_profile = len(profile[1]) //2
+                    profile_pitch = profile[:,:length_profile]
+                    profile_radius = profile[:,length_profile:]
+                    predicted_profile_pitch = predicted_profile[:,:length_profile]
+                    predicted_profile_radius = predicted_profile[:,length_profile:]
+                    """if self.config["smooth"]:
+                        # smooth the predicted profiles to ignore the noise
+                        predicted_profile_pitch = np.apply_along_axis(
+                            lambda x: np.convolve(x, np.ones(5)/5, mode='same'), axis=1, arr=predicted_profile_pitch
+                        )
+                        predicted_profile_radius = np.apply_along_axis(
+                            lambda x: np.convolve(x, np.ones(5)/5, mode='same'), axis=1, arr=predicted_profile_radius
+                        )"""
 
-                plt.figure()
-                plt.plot(predicted_profile[index_min], label=f"Reconstruction, {value} = {predicted_values[i][index_min]} ", c = 'r')
-                plt.plot(profile[index_min], label=f"True, {value} = {true_values[i][index_min]} ", c = 'g')
-                plt.legend()
-                plt.savefig(self.res_folder / f"min_error_{value}.png")
-                plt.close()
+                    plt.figure()
+                    plt.plot(predicted_profile_pitch[index_max], label=f"Reconstruction, {value} = {predicted_values[i][index_max]} ", c = 'r')
+                    plt.plot(profile_pitch[index_max], label=f"True, {value} = {true_values[i][index_max]} ", c = 'g')
+                    plt.plot(predicted_profile_radius[index_max], label=f"Reconstruction, {value} = {predicted_values[i][index_max]} ", c = 'b')
+                    plt.plot(profile_radius[index_max], label=f"True, {value} = {true_values[i][index_max]} ", c = 'y')
+                    plt.legend()
+                    plt.savefig(self.res_folder / f"max_error_{value}.png")
+                    plt.close()
+
+                    plt.figure()
+                    plt.plot(predicted_profile_pitch[index_min], label=f"Reconstruction, {value} = {predicted_values[i][index_min]} ", c = 'r')
+                    plt.plot(profile_pitch[index_min], label=f"True, {value} = {true_values[i][index_min]} ", c = 'g')
+                    plt.plot(predicted_profile_radius[index_min], label=f"Reconstruction, {value} = {predicted_values[i][index_min]} ", c = 'b')
+                    plt.plot(profile_radius[index_min], label=f"True, {value} = {true_values[i][index_min]} ", c = 'y')
+                    plt.legend()
+                    plt.savefig(self.res_folder / f"min_error_{value}.png")
+                    plt.close()
+
+                else:
+                    plt.figure()
+                    plt.plot(predicted_profile[index_max], label=f"Reconstruction, {value} = {predicted_values[i][index_max]} ", c = 'r')
+                    plt.plot(profile[index_max], label=f"True, {value} = {true_values[i][index_max]} ", c = 'g')
+                    plt.legend()
+                    plt.savefig(self.res_folder / f"max_error_{value}.png")
+                    plt.close()
+
+                    plt.figure()
+                    plt.plot(predicted_profile[index_min], label=f"Reconstruction, {value} = {predicted_values[i][index_min]} ", c = 'r')
+                    plt.plot(profile[index_min], label=f"True, {value} = {true_values[i][index_min]} ", c = 'g')
+                    plt.legend()
+                    plt.savefig(self.res_folder / f"min_error_{value}.png")
+                    plt.close()
 
 
         else:

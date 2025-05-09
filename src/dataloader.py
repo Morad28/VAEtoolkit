@@ -562,7 +562,13 @@ class DataLoaderCoilsMulti(DataLoader):
         
         
     def get_x_y(self, value = 'cutoff'):
-        x = self.dataset['data']
+        if type(self.dataset['data']) == dict:
+            if self.config["profile_types"] == 2:
+                x = np.concatenate(self.dataset['data']['pitch'], self.dataset['data']['radius'], axis=-1)
+            else:
+                x = self.dataset['data']['pitch']
+        else:
+            x = self.dataset['data']
         values = self.config["values"]
         y = []
         for value in values:
@@ -596,11 +602,15 @@ class DataLoaderCoilsMulti(DataLoader):
     def apply_mask(self,filter):
         keys = list(filter.keys())
         for key in keys:
+            # actually you should not put multiple keys in the filter, but just in case
             if key not in self.dataset['values'].keys():
                 raise ValueError(f"The key {key} is not in the dataset. Please check the filter.")
             val_to_mask = np.array(self.dataset['values'][key])
             mask = val_to_mask >= filter[key]
-        
+
+            for value in self.dataset['values'].keys():
+                if value != key:
+                    self.dataset['values'][value] = np.array(self.dataset['values'][value])[mask]
             self.dataset['values'][key] = np.array(self.dataset['values'][key])[mask]
 
             length_dataset = len(self.dataset['data'])
@@ -628,7 +638,13 @@ class DataLoaderCoilsMulti(DataLoader):
 
         self.values = self.config["values"]
         
-        loaded_dataset['data'] = np.array(loaded_dataset['data'])
+        if type(loaded_dataset['data']) == dict:
+            if self.config["profile_types"] == 2:
+                loaded_dataset['data'] = np.concatenate((loaded_dataset['data']['pitch'], loaded_dataset['data']['radius']), axis=-1)
+            else:
+                loaded_dataset['data'] = np.array(loaded_dataset['data']['pitch'])
+        else:
+            loaded_dataset['data'] = np.array(loaded_dataset['data'])
         std = np.std(loaded_dataset["data"])
         mean = np.mean(loaded_dataset["data"])
         self.vae_norm = {"profile": {"mean": mean, "std": std}}
@@ -709,3 +725,5 @@ class DataLoaderCoilsMulti(DataLoader):
 
         
         return(model)
+
+

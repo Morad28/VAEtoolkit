@@ -1220,8 +1220,15 @@ class PostprocessingCoilsMulti(PostprocessingBase):
                 pred = prediction[-self.values_nb+i] / self.gain_weight * self.vae_norm[value]["std"] + self.vae_norm[value]["mean"]
                 pred = pred * 100 // 1 / 100
                 vals.append(pred)
-    
-        self.ax_detail.plot(self.time, laser * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"], label=f" Values: {self.values}={vals}")
+
+        if self.config["profile_types"] == 2:
+            length_profile = len(laser)//2
+            pitch = laser[:length_profile]
+            radius = laser[length_profile:]
+            self.ax_detail.plot(self.time, pitch * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"], label=f" Pitch, Values: {self.values}={vals}")
+            self.ax_detail.plot(self.time, radius * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"], label=f" Radius, Values: {self.values}={vals}")
+        else:
+            self.ax_detail.plot(self.time, laser * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"], label=f" Values: {self.values}={vals}")
         self.ax_detail.set_title("Profiles")
         self.ax_detail.legend()
         self.canvas_detail.draw()

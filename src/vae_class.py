@@ -889,8 +889,31 @@ class VAE_multi_decoder_encoder(keras.Model):
             reconstructions = [tf.cast(reconstruction, dtype=tf.float32) for reconstruction in reconstructions]
 
             # Compute reconstruction losses
-            reconstruction_loss_profile = k1 * tf.reduce_mean(tf.square(input[:, :-len_values] - reconstructions[0]))
+            if self.config["profile_types"] == 2 and self.config["sep_loss"]:
+                length_profile = len(input[0, :-len_values]) //2
+                loss_pitch = tf.reduce_mean(tf.square(input[:, :length_profile] - reconstructions[0][:, :length_profile]))
+                loss_radius = tf.reduce_mean(tf.square(input[:, length_profile:2*length_profile] - reconstructions[0][:, length_profile:2*length_profile]))
+                pitch_weight = self.config["pitch_loss"] / (self.config["pitch_loss"] + self.config["radius_loss"])
+                radius_weight = self.config["radius_loss"] / (self.config["pitch_loss"] + self.config["radius_loss"])
+                reconstruction_loss_profile = k1 * (radius_weight * loss_radius + pitch_weight * loss_pitch)
+            else:
+                reconstruction_loss_profile = k1 * tf.reduce_mean(tf.square(input[:, :-len_values] - reconstructions[0]))
             reconstruction_loss_values = k3 * tf.reduce_mean(tf.square(input[:, -len_values:] - reconstructions[1]))
+
+            if self.config["smooth"]:
+                # add a penalty if the reconstructed profiles get too noisy
+                if self.config["profile_types"] == 2:
+                    length_profile = len(input[0, :-len_values]) //2
+                    smooth_loss = tf.reduce_mean(tf.square(reconstructions[0][:, 2:length_profile] - 2*reconstructions[0][:, 1:length_profile-1] + reconstructions[0][:, :length_profile-2]))
+                    smooth_loss += tf.reduce_mean(tf.square(reconstructions[0][:, length_profile+2:] - 2*reconstructions[0][:, length_profile+1:-1] + reconstructions[0][:, length_profile:-2]))
+                else:
+                    smooth_loss = tf.reduce_mean(tf.square(reconstructions[0][:, 2:] - 2*reconstructions[0][:, 1:-1] + reconstructions[0][:, :-2]))
+                reconstruction_loss_profile += smooth_loss * self.config["smooth_loss"]
+
+                """edge_left = tf.reduce_mean(tf.square(reconstructions[0][:, 1] - reconstructions[0][:, 0]))
+                edge_right = tf.reduce_mean(tf.square(reconstructions[0][:, -1] - reconstructions[0][:, -2]))
+                reconstruction_loss_profile += edge_left * self.config["smooth_loss"]
+                reconstruction_loss_profile += edge_right * self.config["smooth_loss"]"""
 
 
             # KL divergence loss
@@ -961,8 +984,26 @@ class VAE_multi_decoder_encoder(keras.Model):
         reconstructions = [tf.cast(reconstruction, dtype=tf.float32) for reconstruction in reconstructions]
 
         # Compute reconstruction losses
-        reconstruction_loss_profile = k1 * tf.reduce_mean(tf.square(input[:, :-len_values] - reconstructions[0]))
+        if self.config["profile_types"] == 2 and self.config["sep_loss"]:
+            length_profile = len(input[0, :-len_values])  //2
+            loss_pitch = tf.reduce_mean(tf.square(input[:, :length_profile] - reconstructions[0][:, :length_profile]))
+            loss_radius = tf.reduce_mean(tf.square(input[:, length_profile:2*length_profile] - reconstructions[0][:, length_profile:2*length_profile]))
+            pitch_weight = self.config["pitch_loss"] / (self.config["pitch_loss"] + self.config["radius_loss"])
+            radius_weight = self.config["radius_loss"] / (self.config["pitch_loss"] + self.config["radius_loss"])
+            reconstruction_loss_profile = k1 * (radius_weight * loss_radius + pitch_weight * loss_pitch)
+        else:
+            reconstruction_loss_profile = k1 * tf.reduce_mean(tf.square(input[:, :-len_values] - reconstructions[0]))
         reconstruction_loss_values = k3 * tf.reduce_mean(tf.square(input[:, -len_values:] - reconstructions[1]))
+
+        if self.config["smooth"]:
+            # add a penalty if the reconstructed profiles get too noisy
+            if self.config["profile_types"] == 2:
+                length_profile = len(input[0, :-len_values]) //2
+                smooth_loss = tf.reduce_mean(tf.square(reconstructions[0][:, 2:length_profile] - 2*reconstructions[0][:, 1:length_profile-1] + reconstructions[0][:, :length_profile-2]))
+                smooth_loss += tf.reduce_mean(tf.square(reconstructions[0][:, length_profile+2:] - 2*reconstructions[0][:, length_profile+1:-1] + reconstructions[0][:, length_profile:-2]))
+            else:
+                smooth_loss = tf.reduce_mean(tf.square(reconstructions[0][:, 2:] - 2*reconstructions[0][:, 1:-1] + reconstructions[0][:, :-2]))
+            reconstruction_loss_profile += smooth_loss * self.config["smooth_loss"]
 
         # Combine reconstruction losses
         reconstruction_loss = reconstruction_loss_profile + reconstruction_loss_values

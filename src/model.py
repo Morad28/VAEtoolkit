@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow import keras
 from keras import layers, losses, Model
-from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTranspose, MaxPooling2D, Flatten, Reshape, MaxPooling1D, UpSampling1D, Concatenate
+from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTranspose, MaxPooling2D, Flatten, Reshape, MaxPooling1D, UpSampling1D, Concatenate, UpSampling2D
 from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG, VAE_multi_decoder, VAE_multi_decoder_encoder
 
 
@@ -558,15 +558,28 @@ class ModelSelector:
         vals = inputs[:,-len_values:,:]
         vals = Flatten()(vals)
 
-        out_shape = input_shape[0] - len_values
-        
-        # Encoder CNN
-        x = Conv1D(32, 3, activation='leaky_relu', padding='same', strides=1)(profile)
-        x = MaxPooling1D(pool_size=2)(x)  # Output: (20, 32)
-        x = Conv1D(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
-        x = MaxPooling1D(pool_size=2)(x)  # Output: (10, 64)
-        x = Conv1D(128, 3, activation='leaky_relu', padding='same', strides=1)(x)
-        x = Flatten()(x)  # Output: (1280,)
+        if config["profile_types"] == 2:
+            out_shape = (input_shape[0] - len_values) // 2
+            # Encoder CNN
+            # reshape the input to have 2 channels
+            x = Reshape((out_shape, 2, 1))(profile)
+            x = Conv2D(32, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            x = MaxPooling2D(pool_size=2)(x)  # Output: (10, 32)
+            x = Conv2D(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            x = MaxPooling2D(pool_size=(2,1))(x)  # Output: (5, 64)
+            x = Conv2D(128, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            x = Flatten()(x)  # Output: (1280,)
+        else:
+            out_shape = input_shape[0] - len_values
+            # Encoder CNN
+            x = Conv1D(32, 3, activation='leaky_relu', padding='same', strides=1)(profile)
+            x = MaxPooling1D(pool_size=2)(x)  # Output: (20, 32)
+            x = Conv1D(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            x = MaxPooling1D(pool_size=2)(x)  # Output: (10, 64)
+            x = Conv1D(128, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            x = Flatten()(x)  # Output: (1280,)
+
+
         encoder_cnn = keras.Model(profile, x, name="encoder_cnn")
         encoder_cnn.compile()
 
@@ -587,16 +600,25 @@ class ModelSelector:
 
         # Decoder CNN (profile)
         latent_inputs = Input(shape=(latent_dim,))
-        x = Dense(10 * 128, activation='leaky_relu')(latent_inputs)  # Match flattened size
         # remove the values from the output
-        x = Reshape((10, 128))(x)  # Output: (10, 128)
-        x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
-        x = UpSampling1D(size=2)(x)  # Output: (20, 64)
-        x = Conv1DTranspose(32, 3, activation='leaky_relu', padding='same', strides=1)(x)
-        x = UpSampling1D(size=2)(x)  # Output: (40, 32)
-        x = Conv1DTranspose(1, 3, activation='linear', padding='same', strides=1)(x)  # Output: (40, 1)
-        decoded = Reshape((out_shape,))(x)
-        # Concatenate the values to the output
+        if config["profile_types"] == 2:
+            x = Dense(1500, activation='leaky_relu')(latent_inputs)  # Match flattened size
+            x = Reshape((25, 2, 30))(x)
+            x = Conv2DTranspose(64, 3, activation='leaky_relu', padding='same', strides=(2,1))(x)
+            x = Conv2DTranspose(32, 3, activation='leaky_relu', padding='same', strides=(2,1))(x)
+            x = Conv2DTranspose(1, 3, activation='linear', padding='same', strides=1)(x)
+            # the dimension is (100, 8, 1), we need to reshape it to (200,), so we need to obtain (100, 2, 1) first with a neural network layer
+            decoded = Reshape((out_shape*2,))(x)
+        else:
+            x = Dense(1280, activation='leaky_relu')(latent_inputs)  # Match flattened size
+            x = Reshape((10, 128))(x)  # Output: (10, 128)
+            x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            x = UpSampling1D(size=2)(x)  # Output: (20, 64)
+            x = Conv1DTranspose(32, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            x = UpSampling1D(size=2)(x)  # Output: (40, 32)
+            x = Conv1DTranspose(1, 3, activation='linear', padding='same', strides=1)(x)  # Output: (40, 1)
+            decoded = Reshape((out_shape,))(x)
+            # Concatenate the values to the output
         decoder_cnn = tf.keras.Model(latent_inputs, decoded, name='decoder')
         decoder_cnn.compile()
 
