@@ -8,7 +8,7 @@
     "name": "dyn-shell",
     "sep_loss" : 1,
     "smooth": 0,
-    "epoch_vae": 5000,
+    "epoch_vae": 1,
     "epoch_rna": 1,
     "latent_dim": 10,
     "batch_size_vae": 256,
