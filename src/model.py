@@ -561,13 +561,14 @@ class ModelSelector:
         if config["profile_types"] == 2:
             out_shape = (input_shape[0] - len_values) // 2
             # Encoder CNN
-            # reshape the input to have 2 channels
-            x = Reshape((out_shape, 2, 1))(profile)
-            x = Conv2D(32, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            # reshape the input to have 1 channel
+            x = Reshape((out_shape, 2, 1))(profile) # batch size, height, width, channels
+            # the kernels are applied to all channels and the results are summed
+            x = Conv2D(32, (3,2), activation='leaky_relu', padding='same', strides=1)(x)
             x = MaxPooling2D(pool_size=2)(x)  # Output: (10, 32)
-            x = Conv2D(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            x = Conv2D(64, (3,2), activation='leaky_relu', padding='same', strides=1)(x)
             x = MaxPooling2D(pool_size=(2,1))(x)  # Output: (5, 64)
-            x = Conv2D(128, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            x = Conv2D(128, (3,2), activation='leaky_relu', padding='same', strides=1)(x)
             x = Flatten()(x)  # Output: (1280,)
         else:
             out_shape = input_shape[0] - len_values
@@ -604,10 +605,9 @@ class ModelSelector:
         if config["profile_types"] == 2:
             x = Dense(1500, activation='leaky_relu')(latent_inputs)  # Match flattened size
             x = Reshape((25, 2, 30))(x)
-            x = Conv2DTranspose(64, 3, activation='leaky_relu', padding='same', strides=(2,1))(x)
-            x = Conv2DTranspose(32, 3, activation='leaky_relu', padding='same', strides=(2,1))(x)
-            x = Conv2DTranspose(1, 3, activation='linear', padding='same', strides=1)(x)
-            # the dimension is (100, 8, 1), we need to reshape it to (200,), so we need to obtain (100, 2, 1) first with a neural network layer
+            x = Conv2DTranspose(64, (3,2), activation='leaky_relu', padding='same', strides=(2,1))(x)
+            x = Conv2DTranspose(32, (3,2), activation='leaky_relu', padding='same', strides=(2,1))(x)
+            x = Conv2DTranspose(1, (3,2), activation='linear', padding='same', strides=1)(x)
             decoded = Reshape((out_shape*2,))(x)
         else:
             x = Dense(1280, activation='leaky_relu')(latent_inputs)  # Match flattened size
