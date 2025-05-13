@@ -590,7 +590,7 @@ class ModelSelector:
 
         # Encoder MLP (values)
         x2 = Dense(64, activation='leaky_relu')(vals)
-        x2 = Dense(128, activation='leaky_relu')(x2)
+        x2 = Dense(config["gain_latent_size"], activation='leaky_relu')(x2)
         x2 = Flatten()(x2)  # Flatten the values
         encoder_mlp = keras.Model(vals, x2, name="encoder_mlp")
         encoder_mlp.compile()
