@@ -3,11 +3,11 @@
     "Model" : {
         "vae" : "COILS-MULTI-OUT-DUO"
     },
-    "dataset_path": "datasets/db_pitch_radius_2400.npy",
-    "results_dir": "pitch_radius_test_2400/",
+    "dataset_path": "datasets/db_pitch_radius_5700.npy",
+    "results_dir": "pitch_radius_test_5700/",
     "name": "dyn-shell",
     "sep_loss" : 1,
-    "smooth": 0,
+    "smooth": 1,
     "epoch_vae": 5000,
     "epoch_rna": 1,
     "latent_dim": 10,
@@ -21,7 +21,8 @@
     "pitch_loss": 1,
     "smooth_loss": 1,
     "physical_penalty_weight" : 0,
-    "gain_weight" : 10,
+    "gain_weight" : 0.1,
+    "gain_latent_size": 16,
     "training" : [],
     "values" : ["e99"],
     "predict_z_mean" : 0,
@@ -30,9 +31,9 @@
     "heatmap": "e99",
     "reprise" : {
         "gain_only" : 0,
-        "result_folder" : "./pitch_radius_test_2400/"
+        "result_folder" : "./pitch_radius_test_5700/"
     },
     "filter" : {
-        "e99" : 20
+        "e99" : 25
     }
 }

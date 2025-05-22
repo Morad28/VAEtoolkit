@@ -1,8 +1,8 @@
 import tensorflow as tf
 from tensorflow import keras
 from keras import layers, losses, Model
-from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTranspose, MaxPooling2D, Flatten, Reshape, MaxPooling1D, UpSampling1D, Concatenate, UpSampling2D, ZeroPadding2D
-from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG, VAE_multi_decoder, VAE_multi_decoder_encoder, VAE_singleval
+from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTranspose, MaxPooling2D, Flatten, Reshape, MaxPooling1D, UpSampling1D, Concatenate, UpSampling2D
+from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG, VAE_multi_decoder, VAE_multi_decoder_encoder
 
 
 class ModelSelector:
