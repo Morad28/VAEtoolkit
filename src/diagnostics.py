@@ -104,8 +104,29 @@ class Diagnostics():
 
 
         data, label = data_loader.get_x_y()
+
+        if self.config["Model"]["vae"] == "COILS-MULTI-SINGLEVAL":
+            if self.config["profile_types"] == 2:
+                length_profile = len(data[1]) //2
+                pitch = np.zeros((len(data), length_profile))
+                radius = np.zeros((len(data), length_profile))
+                for i in range(len(data)):
+                    pitch[i] = np.ones(length_profile) * tilde_laser[i][0]
+                    radius[i] = np.ones(length_profile) * tilde_laser[i][1]
+                values = tilde_laser[:,2:]
+                tilde_laser = np.concatenate((pitch, radius, values), axis=1)
+            else:
+                length_profile = len(data[1])
+                profile = np.zeros((len(data), length_profile))
+                for i in range(len(data)):
+                    profile[i] = np.ones(length_profile) * tilde_laser[i][0]
+                values = tilde_laser[:,1:]
+                tilde_laser = np.concatenate((profile, values), axis=1)
+        
+        
         if self.config["DataType"] == "COILS-MULTI":
             values = self.config["values"]
+    
         
         np.savetxt(self.res_folder / 'latent_z.txt',z)
 

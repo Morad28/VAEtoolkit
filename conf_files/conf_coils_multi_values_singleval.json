@@ -1,0 +1,33 @@
+{
+    "DataType" : "COILS-MULTI",
+    "Model" : {
+        "vae" : "COILS-MULTI-SINGLEVAL"
+    },
+    "dataset_path": "datasets/db_pitch_radius_high.npy",
+    "results_dir": "pitch_singleval_radius_test/",
+    "name": "dyn-shell",
+    "sep_loss" : 0,
+    "epoch_vae": 1000,
+    "latent_dim": 10,
+    "batch_size_vae": 256,
+    "min_value": 0.15,
+    "kl_loss": 1e-5,
+    "r_loss" : 1,
+    "gain_loss" : 1,
+    "physical_penalty_weight" : 0,
+    "gain_weight" : 1,
+    "length_profile": 100,
+    "training" : [],
+    "values" : ["e99"],
+    "predict_z_mean" : 0,
+    "num_components" : 1,
+    "profile_types" : 2,
+    "heatmap": "e99",
+    "reprise" : {
+        "gain_only" : 0,
+        "result_folder" : "./pitch_singleval_radius_test/"
+    },
+    "filter" : {
+        "e99" : 30
+    }
+}

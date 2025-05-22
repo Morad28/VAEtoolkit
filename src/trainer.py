@@ -43,7 +43,7 @@ class Trainer(ABC):
         physical_penalty_weight = self.config["physical_penalty_weight"]
         results_path = Path(results_dir)
         results_path.mkdir(parents=True, exist_ok=True)
-        folder_name = f"std_{name}_{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}_{model}"
+        folder_name = f"{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}_{model}"
         if model == "2D-MNIST-MoG":
             folder_name += f"_gaussians_{num_components}"
         if model == "1D-COILS-GAIN" or model == "COILS-MULTI" or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO":
@@ -64,9 +64,11 @@ class Trainer(ABC):
         for key in self.config["filter"]:
             folder_name += f"_{key}min_{self.config['filter'][key]}"
         folder_name += f"_phys_{physical_penalty_weight}"
-        folder_name += f"_epochs_{epoch_vae}"
-        folder_name += f"_sep_loss_{self.config['sep_loss']}"
-        folder_name += f"_smoothing_{self.config['smooth']}"
+        folder_name += f"_epch_{epoch_vae}"
+        if model == "COILS-MULTI-OUT-DUO":
+            folder_name += f"_seploss_{self.config['sep_loss']}"
+            folder_name += f"_smooth_{self.config['smooth']}"
+            folder_name += f"_gaindim_{self.config['gain_latent_size']}"
         self.res_folder = results_path / folder_name
         os.makedirs(os.path.dirname(self.res_folder / 'conf.json'), exist_ok=True)
         self.config["dataset_path"] = os.path.abspath(self.config["dataset_path"])
