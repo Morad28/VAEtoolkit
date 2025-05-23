@@ -163,7 +163,7 @@ class PostprocessingBase(ABC):
         self.root.destroy() 
         
 
-    def plot_main(self):
+    def plot_main(self,*args):
         self.ax_main.clear()
         
         _, gg = self.get_label()
