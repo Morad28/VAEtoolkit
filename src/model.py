@@ -1,8 +1,8 @@
 import tensorflow as tf
 from tensorflow import keras
 from keras import layers, losses, Model
-from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTranspose, MaxPooling2D, Flatten, Reshape, MaxPooling1D, UpSampling1D, Concatenate, UpSampling2D
-from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG, VAE_multi_decoder, VAE_multi_decoder_encoder
+from keras.layers import Input, Dense, Conv1D, Conv2D, Conv1DTranspose, Conv2DTranspose, MaxPooling2D, Flatten, Reshape, MaxPooling1D, UpSampling1D, Concatenate, UpSampling2D, ZeroPadding2D
+from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG, VAE_multi_decoder, VAE_multi_decoder_encoder, VAE_singleval
 
 
 class ModelSelector:
@@ -403,7 +403,7 @@ class ModelSelector:
 
     def _get_1d_vae_coils_gain_multi(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.,
                                 physical_penalty_weight=1, config=None, dataloader=None):
-        """For training on 1D coils with multiple values
+        """For training on 1D coils with multiple scalar values associated with the profile, using the CNN layers
 
         Args:
             input_shape (int, optional): _description_. Defaults to 41.
@@ -465,7 +465,7 @@ class ModelSelector:
 
     def _get_1d_vae_coils_gain_multi_out(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.,
                                 physical_penalty_weight=1, config=None, dataloader=None):
-        """For training on 1D coils with multiple values with the values in the VAE, but not using the CNN layers
+        """For training on 1D coils with multiple scalar values associated with the profile, not using the CNN layers for reconstruction of the scalar values
 
         Args:
             input_shape (int, optional): _description_. Defaults to 41.
@@ -475,7 +475,7 @@ class ModelSelector:
             gain_loss (_type_, optional): _description_. Defaults to 0..
 
         Returns:
-            Model: autoencoder
+            Model: autoencoder, with two decoders: one for the profile and one for the scalar values
         """
         inputs = Input(shape=input_shape)
         len_values = len(config["values"])
@@ -543,7 +543,8 @@ class ModelSelector:
 
     def _get_1d_vae_coils_gain_multi_out_duo(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.,
                                 physical_penalty_weight=1, config=None, dataloader=None):
-        """For training on 1D coils with multiple values with the values in the VAE, but not using the CNN layers, with reconstruction
+        """For training on 1D coils with multiple scalar values associated with the profile, not using the CNN layers for the scalar values for both
+        reconstruction and encoding
 
         Args:
             input_shape (int, optional): _description_. Defaults to 41.
@@ -553,7 +554,8 @@ class ModelSelector:
             gain_loss (_type_, optional): _description_. Defaults to 0..
 
         Returns:
-            Model: autoencoder
+            Model: autoencoder, with two decoders: one for the profile and one for the scalar values,
+            and two encoders: one for the profile and one for the scalar values
         """
         inputs = Input(shape=input_shape)
         len_values = len(config["values"])
@@ -663,7 +665,7 @@ class ModelSelector:
 
     def _get_1d_vae_coils_gain_multi_out_singleval(self, input_shape=(3,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.,
                                 physical_penalty_weight=1, config=None, dataloader=None):
-        """For training on 1D coils with multiple values with the values in the VAE, but not using the CNN layers, with reconstruction
+        """For training on 1D coils not using CNN layers, with coil profiles having constant values (e.g. pitch, radius) and scalar values associated with the profile
 
         Args:
             input_shape (int, optional): _description_. Defaults to 3.

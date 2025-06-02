@@ -274,6 +274,9 @@ class TrainerFCI(Trainer):
     
     
 class TrainerMNIST(Trainer):
+    """
+    Trainer for MNIST dataset.
+    """
     def __init__(self,model_selector : ModelSelector, data_loader : DataLoader, config):
         super().__init__(model_selector, data_loader, config)
         
@@ -314,6 +317,9 @@ class TrainerMNIST(Trainer):
 
 
 class TrainerGain(Trainer):
+    """
+    Trainer for all coil models
+    """
     def __init__(self,model_selector : ModelSelector, data_loader : DataLoader, config):
         super().__init__(model_selector, data_loader, config)
         

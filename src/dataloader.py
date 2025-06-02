@@ -351,7 +351,14 @@ class DataLoaderFCI(DataLoader):
 
 class DataLoaderGain(DataLoader):
     """
-    Incorporates the gain in the data to predict the gain in the VAE model.
+    Data loader for DoPPLight coil data from .npy files. Incorporates the gain in the data to predict the gain in the VAE model.
+    
+    Inherits from DataLoader and implements specific methods for coils data handling.
+    
+    Attributes:
+        _preprocessed (bool): Flag indicating if data has been preprocessed.
+        gain_norm (dict): Dictionary containing normalization factors for gain values.
+        vae_norm (float): Normalization factor for VAE input data.
     """
         
     def __init__(self, config, result_folder=None):
@@ -467,6 +474,15 @@ class DataLoaderGain(DataLoader):
         return(model)
 
 class DataLoaderMNIST(DataLoader):
+    """
+    Data loader for MNIST dataset.
+    Inherits from DataLoader and implements specific methods for MNIST data handling.
+
+    Attributes:
+        take (int): Number of samples to take from the dataset. If -1, takes all samples.
+        vae_norm (float): Normalization factor for VAE input data.
+    """
+
     def __init__(self, config, result_folder = None, take = -1):
         self.take = take
         self.vae_norm = 255.
@@ -544,7 +560,16 @@ class DataLoaderMNIST(DataLoader):
 
 class DataLoaderCoilsMulti(DataLoader):
     """
-    Incorporates the gain in the data to predict the gain in the VAE model.
+    Data loader for DoPPLight coil data from .npy files. Incorporates the gain in the data to predict the gain in the VAE model.
+    Should be used for multi-output VAE models, where the input data is a combination of pitch and radius profiles,
+    and multiple scalar values (e.g., e99) are predicted.
+    
+    Inherits from DataLoader and implements specific methods for coils data handling, with support for multiple output values.
+    
+    Attributes:
+        _preprocessed (bool): Flag indicating if data has been preprocessed.
+        gain_norm (dict): Dictionary containing normalization factors for gain values.
+        vae_norm (float): Normalization factor for VAE input data.
     """
         
     def __init__(self, config, result_folder=None):

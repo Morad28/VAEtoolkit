@@ -252,6 +252,14 @@ class PostprocessingBase(ABC):
     
  
 class PostProcessingMNIST(PostprocessingBase):
+    """
+    Postprocessing class for MNIST dataset.
+
+    This class inherits from PostprocessingBase and implements methods to visualize
+    the MNIST dataset in a latent space, plot details of selected points, and handle
+    interactions with the Tkinter GUI.
+    
+    """
     def __init__(self, root, data_loader: DataLoader):
         super().__init__(root, data_loader)
     
@@ -1133,6 +1141,17 @@ class PostProcessingFCI2D(PostprocessingFCI):
 
 
 class PostprocessingCoilsMulti(PostprocessingBase):
+    """
+    Postprocessing class for COILS-MULTI models, handling multiple scalar values and multiple profile types (radius and pitch).
+
+    Inherits from PostprocessingBase.
+
+    Attributes:
+        values (list): List of names of scalar values to be processed.
+        values_nb (int): Number of scalar values.
+    """
+
+
     def __init__(self, root, data_loader: DataLoader):
         super().__init__(root, data_loader)
         self.values = self.config["values"]

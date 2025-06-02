@@ -388,6 +388,16 @@ class VAE(keras.Model):
 class VAE_MoG(keras.Model):
     '''
     A VAE model, built from given encoder and decoder
+
+    This model uses a Mixture of Gaussians (MoG) for the latent space.
+
+    Attributes:
+        encoder (keras.Model): Encoder model.
+        decoder (keras.Model): Decoder model.
+        loss_weights (list): Weights for the loss functions: reconstruction_loss (values and profile) and kl_loss.
+        total_loss_tracker (keras.metrics.Mean): Tracker for total loss.
+        reconstruction_loss_tracker (keras.metrics.Mean): Tracker for reconstruction loss.
+        kl_loss_tracker (keras.metrics.Mean): Tracker for KL divergence loss.
     '''
 
     version = '1.4'
@@ -579,6 +589,16 @@ class VAE_MoG(keras.Model):
 class VAE_multi_decoder(keras.Model):
     '''
     A VAE model, built from given encoder and decoder
+
+    This model supports multiple decoders, used especially for splitting the reconstruction into different parts (e.g., profile and values).
+
+    Attributes:
+        encoder (keras.Model): Encoder model.
+        decoders (list): List of decoder models.
+        loss_weights (list): Weights for the loss functions: reconstruction_loss (values and profile) and kl_loss.
+        total_loss_tracker (keras.metrics.Mean): Tracker for total loss.
+        reconstruction_loss_tracker (keras.metrics.Mean): Tracker for reconstruction loss.
+        kl_loss_tracker (keras.metrics.Mean): Tracker for KL divergence loss.
     '''
 
     version = '1.4'
@@ -786,6 +806,18 @@ class VAE_multi_decoder(keras.Model):
 class VAE_multi_decoder_encoder(keras.Model):
     '''
     A VAE model, built from given encoder and decoder
+
+    This model supports multiple decoders and encoders, used especially for splitting the encoding and reconstruction into different parts (e.g., profile and values).
+
+    Attributes:
+        encoders (list): List of encoder models.
+        decoders (list): List of decoder models.
+        loss_weights (list): Weights for the loss functions: reconstruction_loss (values and profile) and kl_loss.
+        total_loss_tracker (keras.metrics.Mean): Tracker for total loss.
+        reconstruction_loss_tracker (keras.metrics.Mean): Tracker for reconstruction loss.
+        kl_loss_tracker (keras.metrics.Mean): Tracker for KL divergence loss.
+        values_loss_tracker (keras.metrics.Mean): Tracker for values loss.
+        physical_loss_tracker (keras.metrics.Mean): Tracker for physical penalty loss.
     '''
 
     version = '1.4'
@@ -1065,6 +1097,19 @@ class VAE_multi_decoder_encoder(keras.Model):
 class VAE_singleval(keras.Model):
     '''
     A VAE model, built from given encoder and decoder
+
+    This model is designed for coil profiles that are constant
+
+    Attributes:
+        encoder (keras.Model): Encoder model.
+        decoder (keras.Model): Decoder model.
+        loss_weights (list): Weights for the loss functions: reconstruction_loss and kl_loss.
+        total_loss_tracker (keras.metrics.Mean): Tracker for total loss.
+        reconstruction_loss_tracker (keras.metrics.Mean): Tracker for reconstruction loss.
+        kl_loss_tracker (keras.metrics.Mean): Tracker for KL divergence loss.
+        physical_penalty_weight (float): Weight for the physical penalty in the loss function.
+        config (dict): Configuration dictionary containing model parameters.
+        min_value (float): Minimum value for the physical penalty calculation.
     '''
 
     version = '1.4'
