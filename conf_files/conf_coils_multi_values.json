@@ -3,12 +3,12 @@
     "Model" : {
         "vae" : "COILS-MULTI-OUT-DUO"
     },
-    "dataset_path": "datasets/db_pitch_radius_5700.npy",
-    "results_dir": "pitch_radius_test_5700/",
+    "dataset_path": "datasets/db_june_1_big.npy",
+    "results_dir": "db_june_1_big/",
     "name": "dyn-shell",
     "sep_loss" : 1,
-    "smooth": 1,
-    "epoch_vae": 5000,
+    "smooth": 0,
+    "epoch_vae": 1000,
     "epoch_rna": 1,
     "latent_dim": 10,
     "batch_size_vae": 256,
@@ -24,16 +24,16 @@
     "gain_weight" : 0.1,
     "gain_latent_size": 16,
     "training" : [],
-    "values" : ["e99"],
+    "values" : ["e99", "radius"],
     "predict_z_mean" : 0,
     "num_components" : 1,
-    "profile_types" : 2,
+    "profile_types" : 1,
     "heatmap": "e99",
     "reprise" : {
         "gain_only" : 0,
-        "result_folder" : "./pitch_radius_test_5700/"
+        "result_folder" : "./db_june_1_big/"
     },
     "filter" : {
-        "e99" : 25
+        "e99" : 1e-6
     }
 }

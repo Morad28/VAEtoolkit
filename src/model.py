@@ -624,13 +624,13 @@ class ModelSelector:
             x = Reshape((100, 2))(x)
             decoded = Reshape((out_shape*2,))(x)
         else:
-            x = Dense(1280, activation='leaky_relu')(latent_inputs)  # Match flattened size
-            x = Reshape((10, 128))(x)  # Output: (10, 128)
-            x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
-            x = UpSampling1D(size=2)(x)  # Output: (20, 64)
-            x = Conv1DTranspose(32, 3, activation='leaky_relu', padding='same', strides=1)(x)
-            x = UpSampling1D(size=2)(x)  # Output: (40, 32)
-            x = Conv1DTranspose(1, 3, activation='linear', padding='same', strides=1)(x)  # Output: (40, 1)
+            x = Dense(3200, activation='leaky_relu')(latent_inputs)  # Match flattened size
+            x = Reshape((25, 128))(x)  # Output: (25, 128)
+            x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=1)(x) # Output: (25, 64)
+            x = UpSampling1D(size=2)(x)  # Output: (50, 64)
+            x = Conv1DTranspose(32, 3, activation='leaky_relu', padding='same', strides=1)(x) # Output: (100, 32)
+            x = UpSampling1D(size=2)(x)  # Output: (100, 32)
+            x = Conv1DTranspose(1, 3, activation='linear', padding='same', strides=1)(x)  # Output: (100, 1)
             decoded = Reshape((out_shape,))(x)
             # Concatenate the values to the output
         decoder_cnn = tf.keras.Model(latent_inputs, decoded, name='decoder')

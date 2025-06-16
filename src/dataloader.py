@@ -675,7 +675,10 @@ class DataLoaderCoilsMulti(DataLoader):
         self.vae_norm = {"profile": {"mean": mean, "std": std}}
         
         for value in self.values:
-            loaded_dataset['values'][value] = np.array(loaded_dataset['values'][value])
+            if value == "radius":
+                loaded_dataset['values'][value] = np.array(loaded_dataset['values'][value]) * 1000  # Convert radius from m to mm
+            else:
+                loaded_dataset['values'][value] = np.array(loaded_dataset['values'][value])
             std = np.std(loaded_dataset['values'][value])
             mean = np.mean(loaded_dataset['values'][value])
             self.vae_norm[value] = {"mean": mean, "std": std}

@@ -1518,7 +1518,7 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         dataset_batched = tf.data.Dataset.from_tensor_slices(dataset).batch(256)
         heatmap_value = self.config["heatmap"]
         if self.config["Model"]["vae"] == "COILS-MULTI-OUT" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
-            values = self.decoder_mlp.predict(dataset_batched, verbose=0) / self.gain_weight * self.vae_norm[heatmap_value]["std"] + self.vae_norm[heatmap_value]["mean"]
+            values = self.decoder_mlp.predict(dataset_batched, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[heatmap_value]["std"] + self.vae_norm[heatmap_value]["mean"]
         else:
             values = self.decoder.predict(dataset_batched, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[heatmap_value]["std"] + self.vae_norm[heatmap_value]["mean"]
         values = values.reshape((n, n))
