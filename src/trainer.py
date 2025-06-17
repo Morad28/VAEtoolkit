@@ -46,18 +46,18 @@ class Trainer(ABC):
         folder_name = f"{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}_{model}"
         if model == "2D-MNIST-MoG":
             folder_name += f"_gaussians_{num_components}"
-        if model == "1D-COILS-GAIN" or model == "COILS-MULTI" or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO":
+        if model == "1D-COILS-GAIN" or model == "COILS-MULTI" or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO" or model == "COILS-MULTI-OUT-DUO-FOCUS":
             gain_weight = self.config["gain_weight"]
             folder_name += f"_gw_{gain_weight}"
-            if self.config["sep_loss"] or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO":
+            if self.config["sep_loss"] or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO" or model == "COILS-MULTI-OUT-DUO-FOCUS":
                 gain_loss = self.config["gain_loss"]
                 folder_name += f"_gl_{gain_loss}"
                 r_loss = self.config["r_loss"]
                 folder_name += f"_rl_{r_loss}"
-            if model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO":
+            if model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO" or model == "COILS-MULTI-OUT-DUO-FOCUS":
                 if self.config["predict_z_mean"]:
                     folder_name += "_mean"
-        if model == "COILS-MULTI" or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO":
+        if model == "COILS-MULTI" or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO" or model == "COILS-MULTI-OUT-DUO-FOCUS":
             values = self.config["values"]
             for value in values:
                 folder_name += f"_{value}"
@@ -65,7 +65,7 @@ class Trainer(ABC):
             folder_name += f"_{key}min_{self.config['filter'][key]}"
         folder_name += f"_phys_{physical_penalty_weight}"
         folder_name += f"_epch_{epoch_vae}"
-        if model == "COILS-MULTI-OUT-DUO":
+        if model == "COILS-MULTI-OUT-DUO" or model == "COILS-MULTI-OUT-DUO-FOCUS":
             folder_name += f"_seploss_{self.config['sep_loss']}"
             folder_name += f"_smooth_{self.config['smooth']}"
             folder_name += f"_gaindim_{self.config['gain_latent_size']}"
@@ -399,11 +399,13 @@ class TrainerGain(Trainer):
         )
         
         history = self._train_vae(dataset["train_x"],dataset["val_x"],models)
-        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
             _, encoder_cnn, encoder_mlp, encoder_latent, decoder_cnn, decoder_mlp = models["vae"]
             
             # Combine the three encoders
             cnn_output = encoder_cnn.output
+            if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+                cnn_output = cnn_output[2]  # Extract the latent representation from the CNN output
             mlp_output = encoder_mlp.output
             concatenated = tf.keras.layers.Concatenate()([cnn_output, mlp_output])
             z_mean, z_log_var, z = encoder_latent(concatenated)
@@ -418,7 +420,7 @@ class TrainerGain(Trainer):
         batch_size = 256
         dataset_batched, _ = self.data_loader.to_dataset(batch_size=batch_size, shuffle=False, split=0)
 
-        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
             # Initialize lists to store profile and vals
             profiles = []
             vals = []

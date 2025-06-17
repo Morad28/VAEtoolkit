@@ -44,6 +44,10 @@ class ModelSelector:
             s["vae"] = self._get_1d_vae_coils_gain_multi_out_singleval(input_shape=input_shape, latent_dim=latent_dim,
                                                        r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, config=config,
                                                      dataloader=dataloader, physical_penalty_weight=physical_penalty_weight)
+        if self.vae == 'COILS-MULTI-OUT-DUO-FOCUS':
+            s["vae"] = self._get_1d_vae_coils_gain_multi_out_duo_focus(input_shape=input_shape, latent_dim=latent_dim,
+                                                       r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss, config=config,
+                                                     dataloader=dataloader, physical_penalty_weight=physical_penalty_weight)
         if self.gain == '12MLP':
             s["mlp"] = self._get_gain_network_12_mlp(latent_dim)
         if not bool(s):
@@ -731,3 +735,134 @@ class ModelSelector:
         autoencoder = VAE_singleval(encoder, decoder, [r_loss,k_loss,gain_loss], config=config, min_value = minimum_value, physical_penalty_weight=physical_penalty_weight)
 
         return autoencoder, encoder, decoder
+
+
+    def _get_1d_vae_coils_gain_multi_out_duo_focus(self, input_shape=(41,1), latent_dim=5,r_loss=0., k_loss=1., gain_loss=0.,
+                                physical_penalty_weight=1, config=None, dataloader=None):
+        """For training on 1D coils with multiple scalar values associated with the profile, not using the CNN layers for the scalar values for both
+        reconstruction and encoding, with a focus on the profile first in the latent space and then the scalar values
+
+        Args:
+            input_shape (int, optional): _description_. Defaults to 41.
+            latent_dim (int, optional): _description_. Defaults to 5.
+            r_loss (_type_, optional): _description_. Defaults to 0..
+            k_loss (_type_, optional): _description_. Defaults to 1..
+            gain_loss (_type_, optional): _description_. Defaults to 0..
+
+        Returns:
+            Model: autoencoder, with two decoders: one for the profile and one for the scalar values,
+            and two encoders: one for the profile and one for the scalar values
+        """
+        inputs = Input(shape=input_shape)
+        len_values = len(config["values"])
+
+        profile = inputs[:,:-len_values,:]
+        vals = inputs[:,-len_values:,:]
+        vals = Flatten()(vals)
+
+        if config["profile_types"] == 2:
+            out_shape = (input_shape[0] - len_values) // 2
+            # Encoder CNN
+            # reshape the input to have 1 channel
+            x = Reshape((out_shape, 2, 1))(profile) # batch size, height, width, channels (,100,2,1)
+            # the kernels are applied to all channels and the results are summed
+            # add two columns of padding to the input
+            x = ZeroPadding2D(padding=(1, 1))(x) # (,102,4,1)
+            # this kernel size will allow for the creation of 3 columns, one that focuses on the left profile,
+            # one on the right profile and one the combination of both
+            x = Conv2D(32, (3,2), activation='leaky_relu', padding='valid', strides=1)(x)  # (,100,3,32)
+            x = MaxPooling2D(pool_size=(2,1))(x) # (,50,3,32)
+            x = Conv2D(64, (3,2), activation='leaky_relu', padding='valid', strides=1)(x) # (,48,2,64)
+            x = MaxPooling2D(pool_size=(2,1))(x) # (,24,2,64)
+            x = Conv2D(128, (3,2), activation='leaky_relu', padding='valid', strides=1)(x) # (,22,1,128)
+            x = Flatten()(x) # (,2816,)
+        else:
+            out_shape = input_shape[0] - len_values
+            # Encoder CNN
+            x = Conv1D(32, 3, activation='leaky_relu', padding='same', strides=1)(profile)
+            x = MaxPooling1D(pool_size=2)(x)  # Output: (20, 32)
+            x = Conv1D(64, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            x = MaxPooling1D(pool_size=2)(x)  # Output: (10, 64)
+            x = Conv1D(128, 3, activation='leaky_relu', padding='same', strides=1)(x)
+            x = Flatten()(x)  # Output: (1280,)
+        
+        # first latent space for the profile
+        input_latent_profile = x
+        concat_profile = Dense(128, activation='leaky_relu')(input_latent_profile)
+        z_mean_profile = layers.Dense(latent_dim, name="z_mean")(concat_profile)
+        z_log_var_profile = layers.Dense(latent_dim, name="z_log_var")(concat_profile)
+        z_profile = Sampling()([z_mean_profile, z_log_var_profile])
+
+        encoder_cnn = keras.Model(profile, [z_mean_profile, z_log_var_profile, z_profile], name="encoder_cnn")
+        encoder_cnn.compile()
+
+        # Encoder MLP (values)
+        x2 = Dense(64, activation='leaky_relu')(vals)
+        x2 = Dense(config["gain_latent_size"], activation='leaky_relu')(x2)
+        x2 = Flatten()(x2)  # Flatten the values
+        encoder_mlp = keras.Model(vals, x2, name="encoder_mlp")
+        encoder_mlp.compile()
+
+        # second latent space
+        input_latent = Concatenate()([z_profile, x2])
+        concat = Dense(128, activation='leaky_relu')(input_latent)  # Add a dense layer before the latent space
+        z_mean = layers.Dense(latent_dim, name="z_mean")(concat)
+        z_log_var = layers.Dense(latent_dim, name="z_log_var")(concat)
+        z = Sampling()([z_mean, z_log_var])
+        encoder_latent = keras.Model(input_latent, [z_mean, z_log_var, z], name="encoder_latent")
+        encoder_latent.compile()
+
+        # Decoder CNN (profile)
+        latent_inputs = Input(shape=(latent_dim,))
+        # remove the values from the output
+        if config["profile_types"] == 2:
+            x = Dense(2816, activation='leaky_relu')(latent_inputs)  # Match flattened size
+            x = Reshape((22, 1, 128))(x)
+            x = Conv2DTranspose(64, (3,2), activation='leaky_relu', padding='valid', strides=1)(x)  # (,24,2,64)
+            x = UpSampling2D(size=(2,1))(x)  # Output: (48,2,64)
+            x = ZeroPadding2D(padding=(1, 0))(x) # (,50,2,64)
+            x = Conv2DTranspose(32, (3,2), activation='leaky_relu', padding='same', strides=1)(x) # (,50,2,32)
+            x = UpSampling2D(size=(2,1))(x)  # Output: (100,2,32)
+            x = Conv2DTranspose(1, (3,2), activation='linear', padding='same', strides=1)(x) # (,100,2,1)
+            x = Reshape((100, 2))(x)
+            decoded = Reshape((out_shape*2,))(x)
+        else:
+            x = Dense(3200, activation='leaky_relu')(latent_inputs)  # Match flattened size
+            x = Reshape((25, 128))(x)  # Output: (25, 128)
+            x = Conv1DTranspose(64, 3, activation='leaky_relu', padding='same', strides=1)(x) # Output: (25, 64)
+            x = UpSampling1D(size=2)(x)  # Output: (50, 64)
+            x = Conv1DTranspose(32, 3, activation='leaky_relu', padding='same', strides=1)(x) # Output: (100, 32)
+            x = UpSampling1D(size=2)(x)  # Output: (100, 32)
+            x = Conv1DTranspose(1, 3, activation='linear', padding='same', strides=1)(x)  # Output: (100, 1)
+            decoded = Reshape((out_shape,))(x)
+            # Concatenate the values to the output
+        decoder_cnn = tf.keras.Model(latent_inputs, decoded, name='decoder')
+        decoder_cnn.compile()
+
+        # Decoder MLP (values)
+        x2 = Dense(64, activation='leaky_relu')(latent_inputs)
+        x2 = Dense(128, activation='leaky_relu')(x2)
+        predictions = Dense(len_values, activation='linear')(x2)
+        predictions = Reshape((len_values,))(predictions)
+        decoder_mlp = tf.keras.Model(latent_inputs, predictions, name='decoder2')
+        decoder_mlp.compile()
+
+        print(encoder_cnn.summary())
+        print(encoder_mlp.summary())
+        print(encoder_latent.summary())
+        print(decoder_cnn.summary())
+        print(decoder_mlp.summary())
+        
+        std = dataloader.vae_norm["profile"]["std"]
+        mean = dataloader.vae_norm["profile"]["mean"]
+
+        minimum_value = config["min_value"] if config else 0.
+        # normalize to make it correspond to the data
+        minimum_value = minimum_value * std + mean
+
+        autoencoder = VAE_multi_decoder_encoder([encoder_cnn, encoder_mlp, encoder_latent], [decoder_cnn, decoder_mlp], [r_loss,k_loss,gain_loss], config=config, min_value = minimum_value, physical_penalty_weight=physical_penalty_weight)
+
+        return autoencoder, encoder_cnn, encoder_mlp, encoder_latent, decoder_cnn, decoder_mlp
+
+
+

@@ -1,10 +1,10 @@
 {
     "DataType" : "COILS-MULTI",
     "Model" : {
-        "vae" : "COILS-MULTI-OUT-DUO"
+        "vae" : "COILS-MULTI-OUT-DUO-FOCUS"
     },
-    "dataset_path": "datasets/db_june_1_big.npy",
-    "results_dir": "db_june_1_big/",
+    "dataset_path": "datasets/db_june_1_small.npy",
+    "results_dir": "db_june_1_small/",
     "name": "dyn-shell",
     "sep_loss" : 1,
     "smooth": 0,
@@ -17,21 +17,21 @@
     "kl_loss": 1e-5,
     "r_loss" : 1,
     "gain_loss" : 1,
-    "radius_loss": 1,
+    "radius_loss": 0.02,
     "pitch_loss": 1,
     "smooth_loss": 1,
     "physical_penalty_weight" : 0,
-    "gain_weight" : 0.1,
-    "gain_latent_size": 16,
+    "gain_weight" : 0.05,
+    "gain_latent_size": 10,
     "training" : [],
-    "values" : ["e99", "radius"],
+    "values" : ["e99"],
     "predict_z_mean" : 0,
     "num_components" : 1,
-    "profile_types" : 1,
+    "profile_types" : 2,
     "heatmap": "e99",
     "reprise" : {
         "gain_only" : 0,
-        "result_folder" : "./db_june_1_big/"
+        "result_folder" : "./db_june_1_small/"
     },
     "filter" : {
         "e99" : 1e-6

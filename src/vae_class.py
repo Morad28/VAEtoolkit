@@ -904,6 +904,10 @@ class VAE_multi_decoder_encoder(keras.Model):
             x_cnn = input[:, :-len_values]
             x_mlp = input[:, -len_values:]
             y_cnn = self.encoders[0](x_cnn)
+            if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+                y_cnn_mean = y_cnn[0]
+                y_cnn_log_var = y_cnn[1]
+                y_cnn = y_cnn[2]
             y_mlp = self.encoders[1](x_mlp)
 
             concat = tf.concat([y_cnn, y_mlp], axis=1)
@@ -956,9 +960,16 @@ class VAE_multi_decoder_encoder(keras.Model):
             reconstruction_loss_profile = reconstruction_loss_profile + kl_loss
             total_loss = reconstruction_loss_profile + reconstruction_loss_values
 
+            loss_cnn = reconstruction_loss_profile
+            if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+                kl_loss_profile = 1 + y_cnn_log_var - tf.square(y_cnn_mean) - tf.exp(y_cnn_log_var)
+                kl_loss_profile = -tf.reduce_mean(kl_loss_profile) * k2
+                total_loss += kl_loss_profile
+                loss_cnn += kl_loss_profile
+
         # Backpropagation
         grads_encoder_latent = tape.gradient(total_loss, self.encoders[2].trainable_weights)
-        grads_encoder_cnn = tape.gradient(reconstruction_loss_profile, self.encoders[0].trainable_weights)
+        grads_encoder_cnn = tape.gradient(loss_cnn, self.encoders[0].trainable_weights)
         grads_encoder_mlp = tape.gradient(reconstruction_loss_values, self.encoders[1].trainable_weights)
         grads_cnn = tape.gradient(reconstruction_loss_profile, self.decoders[0].trainable_weights)
         grads_mlp = tape.gradient(reconstruction_loss_values, self.decoders[1].trainable_weights)
@@ -999,6 +1010,10 @@ class VAE_multi_decoder_encoder(keras.Model):
         x_cnn = input[:, :-len_values]
         x_mlp = input[:, -len_values:]
         y_cnn = self.encoders[0](x_cnn)
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+            y_cnn_mean = y_cnn[0]
+            y_cnn_log_var = y_cnn[1]
+            y_cnn = y_cnn[2]
         y_mlp = self.encoders[1](x_mlp)
 
         concat = tf.concat([y_cnn, y_mlp], axis=1)
@@ -1046,6 +1061,11 @@ class VAE_multi_decoder_encoder(keras.Model):
 
         # Total loss
         total_loss = reconstruction_loss + kl_loss
+
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+            kl_loss_profile = 1 + y_cnn_log_var - tf.square(y_cnn_mean) - tf.exp(y_cnn_log_var)
+            kl_loss_profile = -tf.reduce_mean(kl_loss_profile) * k2
+            total_loss += kl_loss_profile
 
         # Update metrics
         self.total_loss_tracker.update_state(total_loss)

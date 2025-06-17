@@ -58,6 +58,8 @@ class Diagnostics():
             
             # Combine the three encoders
             cnn_output = encoder_cnn.output
+            if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+                cnn_output = cnn_output[2]  # Extract the latent representation from the CNN output
             mlp_output = encoder_mlp.output
             concatenated = tf.keras.layers.Concatenate()([cnn_output, mlp_output])
             z_mean, z_log_var, z = encoder_latent(concatenated)

@@ -704,7 +704,7 @@ class DataLoaderCoilsMulti(DataLoader):
             decoder (tf.keras.models): Decoder model.
             latent_space (np.array): Latent space.
         """
-        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
             encoder_mlp = tf.keras.models.load_model(os.path.join( self.result_folder, "encoder_mlp_model.keras"),
                                         custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
             encoder_cnn = tf.keras.models.load_model(os.path.join( self.result_folder, "encoder_cnn_model.keras"),
@@ -716,14 +716,14 @@ class DataLoaderCoilsMulti(DataLoader):
             encoder = tf.keras.models.load_model(os.path.join( self.result_folder, "model-encoder.keras"),
                                         custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
 
-        if self.config["Model"]["vae"] == "COILS-MULTI-OUT" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
             decoder0 = tf.keras.models.load_model(os.path.join( self.result_folder, "decoder_cnn_model.keras"),
                                             custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
             decoder1 = tf.keras.models.load_model(os.path.join( self.result_folder, "decoder_mlp_model.keras"),
                                             custom_objects={'SamplingLayer': SamplingLayer,'Sampling':Sampling})
 
             latent_space = np.loadtxt(os.path.join(self.result_folder,"latent_z.txt"))
-            if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO":
+            if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
                 model = {
                     "encoder_mlp": encoder_mlp,
                     "encoder_cnn": encoder_cnn,
