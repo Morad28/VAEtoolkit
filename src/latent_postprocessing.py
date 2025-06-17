@@ -1259,6 +1259,8 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         self.ax_detail.set_title("Profiles")
         self.ax_detail.legend()
         self.canvas_detail.draw()
+        self.radius = radius * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"]
+        self.pitch = pitch * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"]
         
         
     def save_mapping(self, name = "decoding"):
@@ -1293,9 +1295,13 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         for line in ax.get_lines():
             x_data = line.get_xdata()
             y_data = line.get_ydata()
-            
-            # Stack the data for saving
-            data = np.column_stack((x_data, np.abs(y_data)))
+            print("\n\nydata.shape", y_data.shape)
+            if self.config["profile_types"] == 2:
+                # save pitch and radius separately
+                data = np.column_stack((x_data, self.pitch, self.radius))
+            else:
+                # Stack the data for saving
+                data = np.column_stack((x_data, np.abs(y_data)))
             
             # Save to a text file
             np.savetxt(self.res_folder + f'/laser_{self.detail_window_saving_name.get()}', data, header='time laser', comments='')
