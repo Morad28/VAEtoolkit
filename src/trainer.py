@@ -48,12 +48,12 @@ class Trainer(ABC):
             folder_name += f"_gaussians_{num_components}"
         if model == "1D-COILS-GAIN" or model == "COILS-MULTI" or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO" or model == "COILS-MULTI-OUT-DUO-FOCUS":
             gain_weight = self.config["gain_weight"]
-            folder_name += f"_gw_{gain_weight}"
+            folder_name += f"_gw{gain_weight}"
             if self.config["sep_loss"] or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO" or model == "COILS-MULTI-OUT-DUO-FOCUS":
                 gain_loss = self.config["gain_loss"]
-                folder_name += f"_gl_{gain_loss}"
+                folder_name += f"_gl{gain_loss}"
                 r_loss = self.config["r_loss"]
-                folder_name += f"_rl_{r_loss}"
+                folder_name += f"_rl{r_loss}"
             if model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO" or model == "COILS-MULTI-OUT-DUO-FOCUS":
                 if self.config["predict_z_mean"]:
                     folder_name += "_mean"
@@ -62,13 +62,21 @@ class Trainer(ABC):
             for value in values:
                 folder_name += f"_{value}"
         for key in self.config["filter"]:
-            folder_name += f"_{key}min_{self.config['filter'][key]}"
-        folder_name += f"_phys_{physical_penalty_weight}"
-        folder_name += f"_epch_{epoch_vae}"
+            folder_name += f"_{key}min{self.config['filter'][key]}"
+        if physical_penalty_weight > 0:
+            folder_name += f"_phys{physical_penalty_weight}"
+        folder_name += f"_epch{epoch_vae}"
         if model == "COILS-MULTI-OUT-DUO" or model == "COILS-MULTI-OUT-DUO-FOCUS":
-            folder_name += f"_seploss_{self.config['sep_loss']}"
-            folder_name += f"_smooth_{self.config['smooth']}"
-            folder_name += f"_gaindim_{self.config['gain_latent_size']}"
+            folder_name += f"_seploss{self.config['sep_loss']}"
+            folder_name += f"_smth{self.config['smooth']}"
+            folder_name += f"_gaindim{self.config['gain_latent_size']}"
+            if self.config["kl_annealing"]:
+                folder_name += f"_kla{self.config['kl_annealing'][0]}"
+                if self.config["kl_annealing"] == "cyclical":
+                    folder_name += f"_wrmp{self.config['warmup_steps']}"
+                    folder_name += f"_cyc{self.config['cycle_length']}"
+        if model == "COILS-MULTI-OUT-DUO-FOCUS":
+            folder_name += f"_klpr{self.config['kl_loss_profile']}"
         self.res_folder = results_path / folder_name
         os.makedirs(os.path.dirname(self.res_folder / 'conf.json'), exist_ok=True)
         self.config["dataset_path"] = os.path.abspath(self.config["dataset_path"])
@@ -109,7 +117,7 @@ class Trainer(ABC):
             staircase=True
         ) # Learning rate schedule for MNIST
 
-        optimizer = tf.keras.optimizers.AdamW(learning_rate=lr_schedule)   
+        optimizer = tf.keras.optimizers.AdamW(learning_rate=lr_schedule)
         
         autoencoder.compile(optimizer=optimizer)
         

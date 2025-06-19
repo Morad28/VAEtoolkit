@@ -847,6 +847,10 @@ class VAE_multi_decoder_encoder(keras.Model):
         self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
         self.values_loss_tracker = keras.metrics.Mean(name="values_loss")
         self.physical_loss_tracker = keras.metrics.Mean(name="physical_penalty")
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+            self.kl_loss_profile_tracker = keras.metrics.Mean(name="kl_loss_profile")
+        else:
+            self.kl_loss_profile_tracker = self.kl_loss_tracker
 
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=1e-4,
@@ -870,7 +874,8 @@ class VAE_multi_decoder_encoder(keras.Model):
             self.reconstruction_loss_tracker,
             self.kl_loss_tracker,
             self.values_loss_tracker,
-            self.physical_loss_tracker
+            self.physical_loss_tracker,
+            self.kl_loss_profile_tracker,
         ]
        
     @tf.function
@@ -931,10 +936,10 @@ class VAE_multi_decoder_encoder(keras.Model):
                 loss_radius = tf.reduce_mean(tf.square(input[:, length_profile:2*length_profile] - reconstructions[0][:, length_profile:2*length_profile]))
                 pitch_weight = self.config["pitch_loss"] / (self.config["pitch_loss"] + self.config["radius_loss"])
                 radius_weight = self.config["radius_loss"] / (self.config["pitch_loss"] + self.config["radius_loss"])
-                reconstruction_loss_profile = k1 * (radius_weight * loss_radius + pitch_weight * loss_pitch)
+                reconstruction_loss_profile = (radius_weight * loss_radius + pitch_weight * loss_pitch)
             else:
-                reconstruction_loss_profile = k1 * tf.reduce_mean(tf.square(input[:, :-len_values] - reconstructions[0]))
-            reconstruction_loss_values = k3 * tf.reduce_mean(tf.square(input[:, -len_values:] - reconstructions[1]))
+                reconstruction_loss_profile = tf.reduce_mean(tf.square(input[:, :-len_values] - reconstructions[0]))
+            reconstruction_loss_values = tf.reduce_mean(tf.square(input[:, -len_values:] - reconstructions[1]))
 
             if self.config["smooth"]:
                 # add a penalty to smoothen the outputs if the reconstructed profiles get too noisy
@@ -951,19 +956,40 @@ class VAE_multi_decoder_encoder(keras.Model):
                 reconstruction_loss_profile += edge_left * self.config["smooth_loss"]
                 reconstruction_loss_profile += edge_right * self.config["smooth_loss"]"""
 
+            if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+                k4 = self.config["kl_loss_profile"]
+            
+            # KL loss annealing
+            if self.config["kl_annealing"]:
+                batch_per_epoch = self.config["batch_per_epoch"]
+                if self.config["kl_annealing"] == "monotonic":
+                    warmup_steps = self.config["warmup_steps"]
+                    annealing_coeff = tf.minimum(1.0, tf.cast(self.optimizer.iterations, tf.float32) / batch_per_epoch / warmup_steps)
+                elif self.config["kl_annealing"] == "cyclical":
+                    cycle_length = self.config["cycle_length"]
+                    warmup_steps = self.config["warmup_steps"]
+                    annealing_coeff = tf.minimum(1.0, tf.cast(self.optimizer.iterations, tf.float32) / batch_per_epoch % cycle_length / warmup_steps)
+                else:
+                    raise ValueError("Invalid kl_annealing method. Choose 'monotonic' or 'cyclical'.")
+                k2 = k2 * annealing_coeff
+                if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+                    k4 = k4 * annealing_coeff
 
             # KL divergence loss
             kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
             kl_loss = -tf.reduce_mean(kl_loss) * k2
 
             # Total loss
+            reconstruction_loss_profile_standard = reconstruction_loss_profile
+            reconstruction_loss_values_standard = reconstruction_loss_values
             reconstruction_loss_profile = reconstruction_loss_profile + kl_loss
-            total_loss = reconstruction_loss_profile + reconstruction_loss_values
+            reconstruction_loss_values = reconstruction_loss_values + kl_loss
+            total_loss = k1 * reconstruction_loss_profile + k3 * reconstruction_loss_values
 
             loss_cnn = reconstruction_loss_profile
             if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
                 kl_loss_profile = 1 + y_cnn_log_var - tf.square(y_cnn_mean) - tf.exp(y_cnn_log_var)
-                kl_loss_profile = -tf.reduce_mean(kl_loss_profile) * k2
+                kl_loss_profile = -tf.reduce_mean(kl_loss_profile) * k4
                 total_loss += kl_loss_profile
                 loss_cnn += kl_loss_profile
 
@@ -982,15 +1008,20 @@ class VAE_multi_decoder_encoder(keras.Model):
 
         # Update metrics
         self.total_loss_tracker.update_state(total_loss)
-        self.reconstruction_loss_tracker.update_state(reconstruction_loss_profile)
-        self.values_loss_tracker.update_state(reconstruction_loss_values)
+        self.reconstruction_loss_tracker.update_state(reconstruction_loss_profile_standard)
+        self.values_loss_tracker.update_state(reconstruction_loss_values_standard)
         self.kl_loss_tracker.update_state(kl_loss)
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+            self.kl_loss_profile_tracker.update_state(kl_loss_profile)
+        else:
+            self.kl_loss_profile_tracker.update_state(kl_loss)
 
         return {
             "loss": self.total_loss_tracker.result(),
             "r_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
             "values_loss": self.values_loss_tracker.result(),
+            "kl_loss_profile": self.kl_loss_profile_tracker.result()
         }
     
     @tf.function
@@ -1037,10 +1068,10 @@ class VAE_multi_decoder_encoder(keras.Model):
             loss_radius = tf.reduce_mean(tf.square(input[:, length_profile:2*length_profile] - reconstructions[0][:, length_profile:2*length_profile]))
             pitch_weight = self.config["pitch_loss"] / (self.config["pitch_loss"] + self.config["radius_loss"])
             radius_weight = self.config["radius_loss"] / (self.config["pitch_loss"] + self.config["radius_loss"])
-            reconstruction_loss_profile = k1 * (radius_weight * loss_radius + pitch_weight * loss_pitch)
+            reconstruction_loss_profile = (radius_weight * loss_radius + pitch_weight * loss_pitch)
         else:
-            reconstruction_loss_profile = k1 * tf.reduce_mean(tf.square(input[:, :-len_values] - reconstructions[0]))
-        reconstruction_loss_values = k3 * tf.reduce_mean(tf.square(input[:, -len_values:] - reconstructions[1]))
+            reconstruction_loss_profile = tf.reduce_mean(tf.square(input[:, :-len_values] - reconstructions[0]))
+        reconstruction_loss_values = tf.reduce_mean(tf.square(input[:, -len_values:] - reconstructions[1]))
 
         if self.config["smooth"]:
             # add a penalty if the reconstructed profiles get too noisy
@@ -1053,7 +1084,27 @@ class VAE_multi_decoder_encoder(keras.Model):
             reconstruction_loss_profile += smooth_loss * self.config["smooth_loss"]
 
         # Combine reconstruction losses
-        reconstruction_loss = reconstruction_loss_profile + reconstruction_loss_values
+        reconstruction_loss = k1 * reconstruction_loss_profile + k3 * reconstruction_loss_values
+    
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+            k4 = self.config["kl_loss_profile"]
+            
+        # KL loss annealing
+        if self.config["kl_annealing"]:
+            batch_per_epoch = self.config["batch_per_epoch"]
+            if self.config["kl_annealing"] == "monotonic":
+                warmup_steps = self.config["warmup_steps"]
+                annealing_coeff = tf.minimum(1.0, tf.cast(self.optimizer.iterations, tf.float32) / batch_per_epoch / warmup_steps)
+            elif self.config["kl_annealing"] == "cyclical":
+                cycle_length = self.config["cycle_length"]
+                warmup_steps = self.config["warmup_steps"]
+                annealing_coeff = tf.minimum(1.0, tf.cast(self.optimizer.iterations, tf.float32) / batch_per_epoch % cycle_length / warmup_steps)
+            else:
+                raise ValueError("Invalid kl_annealing method. Choose 'monotonic' or 'cyclical'.")
+            k2 = k2 * annealing_coeff
+            if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+                k4 = k4 * annealing_coeff
+            
 
         # KL divergence loss
         kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
@@ -1064,7 +1115,7 @@ class VAE_multi_decoder_encoder(keras.Model):
 
         if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
             kl_loss_profile = 1 + y_cnn_log_var - tf.square(y_cnn_mean) - tf.exp(y_cnn_log_var)
-            kl_loss_profile = -tf.reduce_mean(kl_loss_profile) * k2
+            kl_loss_profile = -tf.reduce_mean(kl_loss_profile) * k4
             total_loss += kl_loss_profile
 
         # Update metrics
@@ -1072,12 +1123,17 @@ class VAE_multi_decoder_encoder(keras.Model):
         self.reconstruction_loss_tracker.update_state(reconstruction_loss_profile)
         self.values_loss_tracker.update_state(reconstruction_loss_values)
         self.kl_loss_tracker.update_state(kl_loss)
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+            self.kl_loss_profile_tracker.update_state(kl_loss_profile)
+        else:
+            self.kl_loss_profile_tracker.update_state(kl_loss)
 
         return {
             "loss": self.total_loss_tracker.result(),
             "r_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
             "values_loss": self.values_loss_tracker.result(),
+            "kl_loss_profile": self.kl_loss_profile_tracker.result()
         }
     
     def predict(self,inputs):

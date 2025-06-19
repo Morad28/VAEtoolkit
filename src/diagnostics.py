@@ -45,6 +45,63 @@ class Diagnostics():
         plt.legend(frameon=True)
         plt.savefig(res_folder / "losses.png")
         plt.close()
+
+        r_loss = history.history["r_loss"]
+        r_loss_val = history.history["val_r_loss"]
+        if r_loss is not None and r_loss_val is not None:
+            plt.figure()
+            plt.grid(True,which="both")
+            plt.semilogy(r_loss,label="Données d'entraînement")
+            plt.semilogy(r_loss_val,label="Données de validation")
+            plt.ylabel("Reconstruction Loss")
+            plt.xlabel("Epochs")
+            plt.tick_params(axis='both', which='both', direction='in')
+            plt.legend(frameon=True)
+            plt.savefig(res_folder / "reconstruction_losses.png")
+            plt.close()
+        
+        kl_loss = history.history.get("kl_loss", None)
+        kl_loss_val = history.history.get("val_kl_loss", None)
+        if kl_loss is not None and kl_loss_val is not None:
+            plt.figure()
+            plt.grid(True,which="both")
+            plt.semilogy(kl_loss,label="Données d'entraînement")
+            plt.semilogy(kl_loss_val,label="Données de validation")
+            plt.ylabel("KL Loss")
+            plt.xlabel("Epochs")
+            plt.tick_params(axis='both', which='both', direction='in')
+            plt.legend(frameon=True)
+            plt.savefig(res_folder / "kl_losses.png")
+            plt.close()
+        
+        values_loss = history.history.get("values_loss", None)
+        values_loss_val = history.history.get("val_values_loss", None)
+        if values_loss is not None and values_loss_val is not None:
+            plt.figure()
+            plt.grid(True,which="both")
+            plt.semilogy(values_loss,label="Données d'entraînement")
+            plt.semilogy(values_loss_val,label="Données de validation")
+            plt.ylabel("Values Loss")
+            plt.xlabel("Epochs")
+            plt.tick_params(axis='both', which='both', direction='in')
+            plt.legend(frameon=True)
+            plt.savefig(res_folder / "values_losses.png")
+            plt.close()
+        
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+            kl_loss_profile = history.history.get("kl_loss_profile", None)
+            kl_loss_profile_val = history.history.get("val_kl_loss_profile", None)
+            if kl_loss_profile is not None and kl_loss_profile_val is not None:
+                plt.figure()
+                plt.grid(True,which="both")
+                plt.semilogy(kl_loss_profile,label="Données d'entraînement")
+                plt.semilogy(kl_loss_profile_val,label="Données de validation")
+                plt.ylabel("KL Loss Profile")
+                plt.xlabel("Epochs")
+                plt.tick_params(axis='both', which='both', direction='in')
+                plt.legend(frameon=True)
+                plt.savefig(res_folder / "kl_losses_prof.png")
+                plt.close()
         
     def save_errors(self, data_loader : DataLoader):
         cnn_mlp_diff = False
