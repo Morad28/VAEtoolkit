@@ -1259,7 +1259,8 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         self.ax_detail.set_title("Profiles")
         self.ax_detail.legend()
         self.canvas_detail.draw()
-        self.radius = radius * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"]
+        if self.config["profile_types"] == 2:
+            self.radius = radius * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"]
         self.pitch = pitch * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"]
         
         
