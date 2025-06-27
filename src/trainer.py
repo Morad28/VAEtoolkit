@@ -77,6 +77,8 @@ class Trainer(ABC):
                     folder_name += f"_cyc{self.config['cycle_length']}"
         if model == "COILS-MULTI-OUT-DUO-FOCUS":
             folder_name += f"_klpr{self.config['kl_loss_profile']}"
+        if self.config["finetuning"]:
+            folder_name += "_ft"
         self.res_folder = results_path / folder_name
         os.makedirs(os.path.dirname(self.res_folder / 'conf.json'), exist_ok=True)
         self.config["dataset_path"] = os.path.abspath(self.config["dataset_path"])
@@ -97,9 +99,13 @@ class Trainer(ABC):
             multi_decoder = True
             multi_encoder = False
         elif len(models["vae"]) == 6:
-            autoencoder, encoder_cnn, encoder_mlp, enocder_latent, decoder_cnn, decoder_mlp = models["vae"]
+            autoencoder, encoder_cnn, encoder_mlp, encoder_latent, decoder_cnn, decoder_mlp = models["vae"]
             multi_decoder = True
             multi_encoder = True
+        
+        """if self.config["finetuning"]:
+            # load the keras models 
+            autoenc"""
 
         
         '''lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
@@ -117,15 +123,45 @@ class Trainer(ABC):
             staircase=True
         ) # Learning rate schedule for MNIST
 
+        if self.config["finetuning"]:
+            res_folder_old = self.config["res_folder"]
+            # load the weights from the previous model
+            if multi_encoder:
+                encoder_cnn.load_weights(res_folder_old + "/encoder_cnn.weights.h5")
+                encoder_mlp.load_weights(res_folder_old + "/encoder_mlp.weights.h5")
+                encoder_latent.load_weights(res_folder_old + "/encoder_latent.weights.h5")
+                if multi_decoder:
+                    decoder_cnn.load_weights(res_folder_old + "/decoder_cnn.weights.h5")
+                    decoder_mlp.load_weights(res_folder_old + "/decoder_mlp.weights.h5")
+
+
         optimizer = tf.keras.optimizers.AdamW(learning_rate=lr_schedule)
-        
         autoencoder.compile(optimizer=optimizer)
-        
         log_dir = self.res_folder / "logs"
         tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir)
 
+        # --- SubmoduleWeightsSaver integration ---
+        submodules = {}
+        if multi_encoder:
+            submodules["encoder_cnn"] = encoder_cnn
+            submodules["encoder_mlp"] = encoder_mlp
+            submodules["encoder_latent"] = encoder_latent
+            if multi_decoder:
+                submodules["decoder_cnn"] = decoder_cnn
+                submodules["decoder_mlp"] = decoder_mlp
+        else:
+            submodules["encoder"] = encoder
+            if multi_decoder:
+                submodules["decoder_cnn"] = decoder_cnn
+                submodules["decoder_mlp"] = decoder_mlp
+            else:
+                submodules["decoder"] = decoder
+        submodule_weights_saver = SubmoduleWeightsSaver(submodules, self.res_folder, self.config, freq=1)  # Save every epoch
+        # --- End integration ---
+
         callbacks=[
-            tensorboard_callback
+            tensorboard_callback,
+            submodule_weights_saver
         ]
         
         # Train VAE model_selector
@@ -138,16 +174,16 @@ class Trainer(ABC):
         )
         
         self.history["vae"] = history
-
         autoencoder.save(self.res_folder / "model.keras")
+        super(type(autoencoder), autoencoder).save(self.res_folder / "model.keras")
         if multi_encoder:
             encoder_cnn.save(self.res_folder / 'encoder_cnn_model.keras')
             encoder_mlp.save(self.res_folder / 'encoder_mlp_model.keras')
-            enocder_latent.save(self.res_folder / 'encoder_latent_model.keras')
+            encoder_latent.save(self.res_folder / 'encoder_latent_model.keras')
             if multi_decoder:
                 decoder_cnn.save(self.res_folder / 'decoder_cnn_model.keras')
                 decoder_mlp.save(self.res_folder / 'decoder_mlp_model.keras')
-                self.models["vae"] = (autoencoder, encoder_cnn, encoder_mlp, enocder_latent, decoder_cnn, decoder_mlp)
+                self.models["vae"] = (autoencoder, encoder_cnn, encoder_mlp, encoder_latent, decoder_cnn, decoder_mlp)
         else:
             encoder.save(self.res_folder / 'encoder_model.keras')
             if multi_decoder:
@@ -452,3 +488,18 @@ class TrainerGain(Trainer):
 
         np.savetxt(self.res_folder / 'latent_z.txt', z)
         return history
+class SubmoduleWeightsSaver(tf.keras.callbacks.Callback):
+    def __init__(self, submodules, save_dir, config, freq=1):
+        super().__init__()
+        self.submodules = submodules  # dict: name -> model
+        self.save_dir = Path(save_dir)
+        self.freq = freq
+        self.config = config
+        print(f"Submodules: {list(self.submodules.keys())}")
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.save_dir.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
+        if (epoch+1) >= self.config["epoch_vae"]:
+            for name, model in self.submodules.items():
+                path = self.save_dir / f"{name}.weights.h5"
+                model.save_weights(path)

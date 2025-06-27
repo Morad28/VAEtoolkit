@@ -12,6 +12,8 @@ from src.config_vae import get_config
 import threading
 from tkinter import messagebox
 from abc import ABC, abstractmethod
+from scipy.spatial.distance import pdist
+from scipy.spatial import ConvexHull, Delaunay
 
 class PostprocessingBase(ABC):
     def __init__(self, root, data_loader : DataLoader):
@@ -1258,6 +1260,29 @@ class PostprocessingCoilsMulti(PostprocessingBase):
             self.ax_detail.plot(self.time, laser * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"], label=f" Values: {self.values}={vals}")
         self.ax_detail.set_title("Profiles")
         self.ax_detail.legend()
+
+        # Calculate distances to all main points and show min distance
+        if not hasattr(self, 'mean_pairwise_distance'):
+            self.mean_pairwise_distance = np.mean(pdist(self.latent_space))
+        distances = np.linalg.norm(self.latent_space - latent_point, axis=1)
+        min_distance = np.min(distances)
+        relative_distance = min_distance / self.mean_pairwise_distance
+
+        # Calculate the direction from this point to all other points of the clusters, on all dimensions, and check on how many dimensions it is outside the cluster
+        out_dimensions = 0
+        for i in range(len(self.latent_space[0])):
+            if latent_point[0, i] < np.min(self.latent_space[:, i]) or latent_point[0, i] > np.max(self.latent_space[:, i]):
+                out_dimensions += 1
+
+
+        self.ax_detail.text(
+            0.05, 0.95,
+            f"Min dist: {min_distance:.3f}\nRel. to mean: {relative_distance:.3f}\nMean pairwise dist: {self.mean_pairwise_distance:.3f}\nOut dimensions: {out_dimensions}",
+            transform=self.ax_detail.transAxes,
+            fontsize=10, verticalalignment='top',
+            bbox=dict(boxstyle="round", fc="w")
+        )
+
         self.canvas_detail.draw()
         if self.config["profile_types"] == 2:
             self.radius = radius * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"]
