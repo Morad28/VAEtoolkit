@@ -630,7 +630,7 @@ class VAE_multi_decoder(keras.Model):
         self.physical_loss_tracker = keras.metrics.Mean(name="physical_penalty")
 
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=1e-4,
+            initial_learning_rate=self.config["learning_rate"],
             decay_steps=2500,
             decay_rate=0.95,
             staircase=True
@@ -853,7 +853,7 @@ class VAE_multi_decoder_encoder(keras.Model):
             self.kl_loss_profile_tracker = self.kl_loss_tracker
 
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=1e-4,
+            initial_learning_rate=self.config["learning_rate"],
             decay_steps=2500,
             decay_rate=0.95,
             staircase=True
@@ -1000,11 +1000,16 @@ class VAE_multi_decoder_encoder(keras.Model):
         grads_cnn = tape.gradient(reconstruction_loss_profile, self.decoders[0].trainable_weights)
         grads_mlp = tape.gradient(reconstruction_loss_values, self.decoders[1].trainable_weights)
 
-        self.optimizer.apply_gradients(zip(grads_encoder_latent, self.encoders[2].trainable_weights))
-        self.optimizer_cnn_encoder.apply_gradients(zip(grads_encoder_cnn, self.encoders[0].trainable_weights))
-        self.optimizer_mlp_encoder.apply_gradients(zip(grads_encoder_mlp, self.encoders[1].trainable_weights))
-        self.optimizer_cnn.apply_gradients(zip(grads_cnn, self.decoders[0].trainable_weights))
-        self.optimizer_mlp.apply_gradients(zip(grads_mlp, self.decoders[1].trainable_weights))
+        if self.encoders[2].trainable_weights:
+            self.optimizer.apply_gradients(zip(grads_encoder_latent, self.encoders[2].trainable_weights))
+        if self.encoders[0].trainable_weights:
+            self.optimizer_cnn_encoder.apply_gradients(zip(grads_encoder_cnn, self.encoders[0].trainable_weights))
+        if self.encoders[1].trainable_weights:
+            self.optimizer_mlp_encoder.apply_gradients(zip(grads_encoder_mlp, self.encoders[1].trainable_weights))
+        if self.decoders[0].trainable_weights:
+            self.optimizer_cnn.apply_gradients(zip(grads_cnn, self.decoders[0].trainable_weights))
+        if self.decoders[1].trainable_weights:
+            self.optimizer_mlp.apply_gradients(zip(grads_mlp, self.decoders[1].trainable_weights))
 
         # Update metrics
         self.total_loss_tracker.update_state(total_loss)

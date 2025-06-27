@@ -79,6 +79,8 @@ class Trainer(ABC):
             folder_name += f"_klpr{self.config['kl_loss_profile']}"
         if self.config["finetuning"]:
             folder_name += "_ft"
+        if self.config["transfer_learning"]:
+            folder_name += "_tl"
         self.res_folder = results_path / folder_name
         os.makedirs(os.path.dirname(self.res_folder / 'conf.json'), exist_ok=True)
         self.config["dataset_path"] = os.path.abspath(self.config["dataset_path"])
@@ -117,22 +119,60 @@ class Trainer(ABC):
         
         # do a lr_schedule for MNIST
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=1e-4,
+            initial_learning_rate=self.config["learning_rate"],
             decay_steps=2500,
             decay_rate=0.95,
             staircase=True
         ) # Learning rate schedule for MNIST
 
         if self.config["finetuning"]:
+            if not multi_encoder or not multi_decoder:
+                raise ValueError("Transfer learning is only supported for multi-encoder and multi-decoder models.")
             res_folder_old = self.config["res_folder"]
             # load the weights from the previous model
-            if multi_encoder:
-                encoder_cnn.load_weights(res_folder_old + "/encoder_cnn.weights.h5")
-                encoder_mlp.load_weights(res_folder_old + "/encoder_mlp.weights.h5")
-                encoder_latent.load_weights(res_folder_old + "/encoder_latent.weights.h5")
-                if multi_decoder:
-                    decoder_cnn.load_weights(res_folder_old + "/decoder_cnn.weights.h5")
-                    decoder_mlp.load_weights(res_folder_old + "/decoder_mlp.weights.h5")
+            encoder_cnn.load_weights(res_folder_old + "/encoder_cnn.weights.h5")
+            encoder_mlp.load_weights(res_folder_old + "/encoder_mlp.weights.h5")
+            encoder_latent.load_weights(res_folder_old + "/encoder_latent.weights.h5")
+            decoder_cnn.load_weights(res_folder_old + "/decoder_cnn.weights.h5")
+            decoder_mlp.load_weights(res_folder_old + "/decoder_mlp.weights.h5")
+        
+        if self.config["transfer_learning"]:
+            if not multi_encoder or not multi_decoder:
+                raise ValueError("Transfer learning is only supported for multi-encoder and multi-decoder models.")
+            res_folder_old = self.config["res_folder"]
+            # load the weights from the previous model
+            encoder_cnn.load_weights(res_folder_old + "/encoder_cnn.weights.h5")
+            encoder_mlp.load_weights(res_folder_old + "/encoder_mlp.weights.h5")
+            encoder_latent.load_weights(res_folder_old + "/encoder_latent.weights.h5")
+            decoder_cnn.load_weights(res_folder_old + "/decoder_cnn.weights.h5")
+            decoder_mlp.load_weights(res_folder_old + "/decoder_mlp.weights.h5")
+            # freeze all layers and add a trainable layer to the decoders
+            encoder_cnn.trainable = False
+            encoder_mlp.trainable = False
+            encoder_latent.trainable = False
+            decoder_cnn.trainable = True
+            decoder_mlp.trainable = True
+            #this will be to adapt depending on the quality of the transfer learning dataset
+            """#reset the weights of the decoders
+            decoder_cnn.set_weights([np.random.rand(*w.shape)-0.5 for w in decoder_cnn.get_weights()])
+            decoder_mlp.set_weights([np.random.rand(*w.shape)-0.5 for w in decoder_mlp.get_weights()])"""
+            """ only last layer not enough for training
+            # replace the last layer of the decoders (not the reshape layers) with the same layer but trainable and with random weights
+            decoder_cnn_last_layer = decoder_cnn.layers[-3]
+            decoder_mlp_last_layer = decoder_mlp.layers[-2]
+            print(f"Decoder CNN last layer: {decoder_cnn_last_layer}"
+                  f"\nDecoder MLP last layer: {decoder_mlp_last_layer}")
+            decoder_cnn_last_layer.trainable = True
+            decoder_mlp_last_layer.trainable = True
+            # For each weight in the layer, generate a random array of the same shape
+            random_weights = [np.random.rand(*w.shape)-0.5 for w in decoder_cnn_last_layer.get_weights()]
+            decoder_cnn_last_layer.set_weights(random_weights)
+            random_weights = [np.random.rand(*w.shape)-0.5 for w in decoder_mlp_last_layer.get_weights()]
+            decoder_mlp_last_layer.set_weights(random_weights)
+            decoder_cnn.layers[-3] = decoder_cnn_last_layer
+            decoder_mlp.layers[-2] = decoder_mlp_last_layer"""
+        
+
 
 
         optimizer = tf.keras.optimizers.AdamW(learning_rate=lr_schedule)

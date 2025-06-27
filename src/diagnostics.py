@@ -290,7 +290,7 @@ class Diagnostics():
                 plt.close()
                 plt.figure()
                 plt.hist(np.array(error_profile_radius) * 100 ,bins=30)
-                plt.title("Erreur de reconstruction du profil de pas")
+                plt.title("Erreur de reconstruction du profil de rayon")
                 plt.xlabel("Erreur (%)")
                 plt.ylabel("Nombre d'échantillons")
                 plt.savefig(self.res_folder / "hist_error_radius.png")
