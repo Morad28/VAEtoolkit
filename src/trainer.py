@@ -43,7 +43,7 @@ class Trainer(ABC):
         physical_penalty_weight = self.config["physical_penalty_weight"]
         results_path = Path(results_dir)
         results_path.mkdir(parents=True, exist_ok=True)
-        folder_name = f"{self.data_loader.get_shape()[0]}_latent_{int(latent_dim)}_kl_{kl_loss}_{batch_size_vae}_{model}"
+        folder_name = f"{self.data_loader.get_shape()[0]}_lt_{int(latent_dim)}_kl_{kl_loss}_{model.split('-')[-1]}"
         if model == "2D-MNIST-MoG":
             folder_name += f"_gaussians_{num_components}"
         if model == "1D-COILS-GAIN" or model == "COILS-MULTI" or model == "COILS-MULTI-OUT" or model == "COILS-MULTI-OUT-DUO" or model == "COILS-MULTI-OUT-DUO-FOCUS":
@@ -64,23 +64,27 @@ class Trainer(ABC):
         for key in self.config["filter"]:
             folder_name += f"_{key}min{self.config['filter'][key]}"
         if physical_penalty_weight > 0:
-            folder_name += f"_phys{physical_penalty_weight}"
-        folder_name += f"_epch{epoch_vae}"
+            folder_name += f"_phy{physical_penalty_weight}"
+        folder_name += f"_epc{epoch_vae}"
         if model == "COILS-MULTI-OUT-DUO" or model == "COILS-MULTI-OUT-DUO-FOCUS":
-            folder_name += f"_seploss{self.config['sep_loss']}"
+            folder_name += f"_spls{self.config['sep_loss']}"
             folder_name += f"_smth{self.config['smooth']}"
-            folder_name += f"_gaindim{self.config['gain_latent_size']}"
+            folder_name += f"_gdm{self.config['gain_latent_size']}"
             if self.config["kl_annealing"]:
                 folder_name += f"_kla{self.config['kl_annealing'][0]}"
                 if self.config["kl_annealing"] == "cyclical":
                     folder_name += f"_wrmp{self.config['warmup_steps']}"
-                    folder_name += f"_cyc{self.config['cycle_length']}"
+                    folder_name += f"_cc{self.config['cycle_length']}"
         if model == "COILS-MULTI-OUT-DUO-FOCUS":
             folder_name += f"_klpr{self.config['kl_loss_profile']}"
         if self.config["finetuning"]:
-            folder_name += "_ft"
+            folder_name = self.config["res_folder"].split("/")[-1]  # Use the provided res_folder name
+            folder_name += f"_epc{epoch_vae}"
+            folder_name += "ft"
         if self.config["transfer_learning"]:
-            folder_name += "_tl"
+            folder_name = self.config["res_folder"].split("/")[-1]  # Use the provided res_folder name
+            folder_name += f"_epc{epoch_vae}"
+            folder_name += "tl"
         self.res_folder = results_path / folder_name
         os.makedirs(os.path.dirname(self.res_folder / 'conf.json'), exist_ok=True)
         self.config["dataset_path"] = os.path.abspath(self.config["dataset_path"])

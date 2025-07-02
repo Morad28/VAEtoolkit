@@ -26,6 +26,9 @@ class Diagnostics():
         self.save_errors(self.trainer.data_loader)
                 
     def save_loss(self, history, res_folder):
+        if self.config["epoch_vae"] == 0:
+            print("No training done, no loss to save.")
+            return
         if history is None:
             print(f"Could not save loss in {res_folder}.")
             return
@@ -314,7 +317,11 @@ class Diagnostics():
                 predicted_value = predicted_values[i]
                 error_value = []
                 for j in range(len(data)):
-                    error_value.append( np.abs(true_value[j] - predicted_value[j]) / np.abs(true_value[j]) )
+                    if np.abs(true_value[j]) > 1e-8:
+                        error_value.append( np.abs(true_value[j] - predicted_value[j]) / np.abs(true_value[j]) )
+                    else:
+                        print(f"Warning: true value is too small for {value} at index {j}, setting error to 0")
+                        error_value.append(0)
                 error_values.append(error_value)
                 plt.figure()
                 plt.hist(np.array(error_value) * 100 ,bins=30)
