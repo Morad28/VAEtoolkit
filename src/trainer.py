@@ -160,7 +160,7 @@ class Trainer(ABC):
             """#reset the weights of the decoders
             decoder_cnn.set_weights([np.random.rand(*w.shape)-0.5 for w in decoder_cnn.get_weights()])
             decoder_mlp.set_weights([np.random.rand(*w.shape)-0.5 for w in decoder_mlp.get_weights()])"""
-            """ only last layer not enough for training
+            """ # only last layer not enough for training apparently
             # replace the last layer of the decoders (not the reshape layers) with the same layer but trainable and with random weights
             decoder_cnn_last_layer = decoder_cnn.layers[-3]
             decoder_mlp_last_layer = decoder_mlp.layers[-2]

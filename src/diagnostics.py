@@ -312,6 +312,7 @@ class Diagnostics():
                 plt.close()
             
             error_values = []
+            relative = True
             for i, value in enumerate(values):
                 true_value = true_values[i]
                 predicted_value = predicted_values[i]
@@ -320,6 +321,7 @@ class Diagnostics():
                     if np.abs(true_value[j]) > 1e-8:
                         error_value.append( np.abs(true_value[j] - predicted_value[j]) / np.abs(true_value[j]) )
                     else:
+                        relative = False
                         print(f"Warning: true value is too small for {value} at index {j}, setting error to 0")
                         error_value.append(0)
                 error_values.append(error_value)
@@ -329,7 +331,21 @@ class Diagnostics():
                 plt.xlabel("Erreur (%)")
                 plt.ylabel("Nombre d'échantillons")
                 plt.savefig(self.res_folder / f"hist_error_{value}.png")
-                plt.close()            
+                plt.close()
+                if not relative:
+                    true_value = true_values[i]
+                    predicted_value = predicted_values[i]
+                    error_value = []
+                    for j in range(len(data)):
+                        error_value.append( np.abs(true_value[j] - predicted_value[j]) )
+                    plt.figure()
+                    plt.hist(np.array(error_value) * 100 ,bins=30)
+                    plt.title(f"Erreur de reconstruction de {value} (absolue)")
+                    plt.xlabel("Erreur absolue")
+                    plt.ylabel("Nombre d'échantillons")
+                    plt.savefig(self.res_folder / f"hist_error_{value}_abs.png")
+                    plt.close()
+
 
 
         else:

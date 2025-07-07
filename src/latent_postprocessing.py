@@ -14,6 +14,7 @@ from tkinter import messagebox
 from abc import ABC, abstractmethod
 from scipy.spatial.distance import pdist
 from scipy.spatial import ConvexHull, Delaunay
+from scipy.stats import gaussian_kde
 
 class PostprocessingBase(ABC):
     def __init__(self, root, data_loader : DataLoader):
@@ -48,7 +49,73 @@ class PostprocessingBase(ABC):
     
     def add_custom_buttons(self, parent):
         """Add custom buttons to the control frame."""
-        pass
+        self.heatmap_active = False
+        self.heatmap_button = tk.Button(parent, text="Show Density Heatmap", command=self.toggle_density_heatmap)
+        self.heatmap_button.pack(pady=10)
+    
+
+    def toggle_density_heatmap(self):
+        self.heatmap_active = not self.heatmap_active
+        if self.heatmap_active:
+            self.heatmap_button.config(text="Hide Density Heatmap")
+            self.show_density_heatmap()
+        else:
+            self.heatmap_button.config(text="Show Density Heatmap")
+            self.plot_main()
+        
+    
+    def show_density_heatmap(self):
+        """Overlay a smooth density mesh on the main plot, coloring all regions."""
+        self.ax_main.clear()
+        _, gg = self.get_label()
+        if self.enablePCA.get():
+            latent_space = self._pca.fit_transform(self.latent_space)
+            x = latent_space[:, self.x_axis_var.get()]
+            y = latent_space[:, self.y_axis_var.get()]
+        else:
+            x = self.latent_space[:, self.x_axis_var.get()]
+            y = self.latent_space[:, self.y_axis_var.get()]
+
+        # KDE on a grid
+        nbins = 100
+        x_min, x_max = x.min(), x.max()
+        y_min, y_max = y.min(), y.max()
+        xx, yy = np.meshgrid(
+            np.linspace(x_min, x_max, nbins),
+            np.linspace(y_min, y_max, nbins)
+        )
+        positions = np.vstack([xx.ravel(), yy.ravel()])
+        values = np.vstack([x, y])
+        kernel = gaussian_kde(values)
+        density = np.reshape(kernel(positions).T, xx.shape)
+
+        # Plot the density mesh
+        mesh = self.ax_main.pcolormesh(xx, yy, density, cmap='hot', shading='auto')
+        # Remove previous colorbar if it exists
+        if hasattr(self, 'heatmap_cb') and self.heatmap_cb:
+            self.heatmap_cb.remove()
+            self.heatmap_cb = None
+        self.heatmap_cb = self.fig_main.colorbar(mesh, ax=self.ax_main)
+        self.heatmap_cb.set_label('Density (KDE)')
+
+        self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()}")
+        self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()}")
+        self.ax_main.set_title("Latent Space Density Mesh")
+        self.canvas_main.draw()
+
+    
+    def toggle_density_heatmap(self):
+        self.heatmap_active = not self.heatmap_active
+        if self.heatmap_active:
+            self.heatmap_button.config(text="Hide Density Heatmap")
+            self.show_density_heatmap()
+        else:
+            self.heatmap_button.config(text="Show Density Heatmap")
+            # Remove the heatmap colorbar if it exists
+            if hasattr(self, 'heatmap_cb') and self.heatmap_cb:
+                self.heatmap_cb.remove()
+                self.heatmap_cb = None
+            self.plot_main()
     
     def add_settings(self,parent):
         """Add custom settings to the control frame."""
@@ -324,6 +391,7 @@ class PostprocessingFCI(PostprocessingBase):
         self.vae_norm = self.data_loader.vae_norm     
         
     def add_custom_buttons(self, parent):
+        super().add_custom_buttons(parent)  # This keeps the base class buttons!
         tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)
         tk.Button(parent, text="Optimize", command=self.find_best).pack(pady=10)
         tk.Button(parent, text="Slices", command=self.show_latent_space).pack(pady=5)
@@ -693,6 +761,7 @@ class PostprocessingGain(PostprocessingBase):
         self.gain_weight = self.data_loader.config["gain_weight"]
         
     def add_custom_buttons(self, parent):
+        super().add_custom_buttons(parent)  # This keeps the base class buttons!
         tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)
         tk.Button(parent, text="Optimize", command=self.find_best).pack(pady=10)
         tk.Button(parent, text="Slices", command=self.show_latent_space).pack(pady=5)
@@ -1178,6 +1247,7 @@ class PostprocessingCoilsMulti(PostprocessingBase):
         self.gain_weight = self.data_loader.config["gain_weight"]
         
     def add_custom_buttons(self, parent):
+        super().add_custom_buttons(parent)  # This keeps the base class buttons!
         tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)
         tk.Button(parent, text="Optimize", command=self.find_best).pack(pady=10)
         tk.Button(parent, text="Slices", command=self.show_latent_space).pack(pady=5)
