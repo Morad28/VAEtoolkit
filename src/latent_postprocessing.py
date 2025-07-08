@@ -1383,6 +1383,14 @@ class PostprocessingCoilsMulti(PostprocessingBase):
             np.savetxt(folder+f"/{value_entry}_{i}_{vals[i]}.dat",
                 list(zip(self.time,np.abs(laser_decoded[i] * self.vae_norm))))
         messagebox.showinfo("Saved all data in", f"{folder}")
+    
+    def _setup_detail_window(self):
+        """
+        Set up the detail window for displaying detailed plots.
+        """
+        super()._setup_detail_window()
+        self.detail_window_saving_name = tk.StringVar(value=".txt")
+        tk.Entry(self.detail_window, textvariable=self.detail_window_saving_name, width=20).pack(side=tk.TOP)
         
             
     def save_plot(self,display_message = True):
@@ -1400,7 +1408,7 @@ class PostprocessingCoilsMulti(PostprocessingBase):
                 data = np.column_stack((x_data, np.abs(y_data)))
             
             # Save to a text file
-            np.savetxt(self.res_folder + f'/laser_{self.detail_window_saving_name.get()}', data, header='time laser', comments='')
+            np.savetxt('./pitch_profiles/profiles_june_sophie' + f'/profile_{self.detail_window_saving_name.get()}', data.T, comments='')
         if display_message:
             messagebox.showinfo("Saved", f"{self.res_folder}")
         
