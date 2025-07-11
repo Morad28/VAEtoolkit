@@ -3,17 +3,17 @@
     "Model" : {
         "vae" : "COILS-MULTI-OUT-DUO-FOCUS"
     },
-    "dataset_path": "datasets/db_sophie_1.npy",
-    "results_dir": "db_sophie_1/",
+    "dataset_path": "datasets/db_june_sophie.npy",
+    "results_dir": "db_june_sophie/",
     "name": "dyn-shell",
     "sep_loss" : 1,
     "smooth": 0,
-    "epoch_vae": 50000,
+    "epoch_vae": 5000,
     "epoch_rna": 1,
     "latent_dim": 5,
     "batch_size_vae": 256,
     "batch_size_rna": 128,
-    "batch_per_epoch": 1,
+    "batch_per_epoch": 8,
     "min_value": 0.15,
     "learning_rate": 1e-4,
     "kl_loss": 1e-5,
@@ -27,10 +27,10 @@
     "pitch_loss": 1,
     "smooth_loss": 1,
     "physical_penalty_weight" : 0,
-    "gain_weight" : 0.1,
+    "gain_weight" : 0.1, 
     "gain_latent_size": 1,
     "training" : [],
-    "values" : ["e99"],
+    "values" : ["e99", "sophie"],
     "predict_z_mean" : 0,
     "num_components" : 1,
     "profile_types" : 2,
@@ -40,7 +40,7 @@
     "res_folder": "db_june_2_2/201_lt_16_kl_1e-05_FOCUS_gw0.1_gl1_rl1_e99_e99min1e-06_epc5000_spls1_smth0_gdm5_klac_wrmp700_cc1001_klpr1e-05",
     "reprise" : {
         "gain_only" : 0,
-        "result_folder" : "./db_sophie_1/"
+        "result_folder" : "./db_june_sophie/"
     },
     "filter" : {
         "e99" : 1e-6

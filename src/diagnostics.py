@@ -339,7 +339,7 @@ class Diagnostics():
                     for j in range(len(data)):
                         error_value.append( np.abs(true_value[j] - predicted_value[j]) )
                     plt.figure()
-                    plt.hist(np.array(error_value) * 100 ,bins=30)
+                    plt.hist(np.array(error_value),bins=30)
                     plt.title(f"Erreur de reconstruction de {value} (absolue)")
                     plt.xlabel("Erreur absolue")
                     plt.ylabel("Nombre d'échantillons")
