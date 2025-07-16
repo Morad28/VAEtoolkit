@@ -3,12 +3,14 @@ import os
 import tkinter as tk
 from src.config_vae import get_config
 from src.model import ModelSelector
-from src.dataloader import DataLoaderFCI, DataLoaderMNIST
-from src.trainer import TrainerFCI, TrainerMNIST
+from src.dataloader import DataLoaderFCI, DataLoaderMNIST, DataLoaderGain, DataLoaderCoilsMulti
+from src.trainer import TrainerFCI, TrainerMNIST, TrainerGain
 from src.latent_postprocessing import (
     PostprocessingFCI,
     PostProcessingMNIST,
     PostProcessingFCI2D,
+    PostprocessingGain,
+    PostprocessingCoilsMulti,
 )
 from src.diagnostics import Diagnostics
 
@@ -19,6 +21,16 @@ DATA_TYPE_MAP = {
         "loader": DataLoaderFCI,
         "trainer": TrainerFCI,
         "postprocessing": PostprocessingFCI,
+    },
+    "1DFCI-GAIN": {
+        "loader": DataLoaderGain,
+        "trainer": TrainerGain,
+        "postprocessing": PostprocessingGain,
+    },
+    "COILS-MULTI": {
+        "loader": DataLoaderCoilsMulti,
+        "trainer": TrainerGain,
+        "postprocessing": PostprocessingCoilsMulti,
     },
     "MNIST": {
         "loader": DataLoaderMNIST,

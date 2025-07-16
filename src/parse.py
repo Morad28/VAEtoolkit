@@ -38,6 +38,14 @@ def parse_args():
     )
 
     parser.add_argument(
+        '--sep_loss',
+        type=bool,
+        choices=[True, False],
+        default=False,
+        help='Separate loss for gain and data in vae'
+    )
+
+    parser.add_argument(
         '--epoch_vae',
         type=int,
         default=100,
@@ -59,6 +67,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        '--num-components',
+        type=int,
+        default=3,
+        help='Number of components in the mixture model'
+    )
+
+    parser.add_argument(
         '--batch_size_vae',
         type=int,
         default=64,
@@ -73,10 +88,45 @@ def parse_args():
     )
 
     parser.add_argument(
+        '--min_value',
+        type=float,
+        default=0.3,
+        help='Minimum value for profile (physically acceptable)'
+    )
+
+    parser.add_argument(
         '--kl_loss',
         type=float,
         default=1e-5,
         help='kl_loss weight'
+    )
+
+    parser.add_argument(
+        '--gain_loss',
+        type=float,
+        default=1.,
+        help='Weight of the gain part of the loss when using a vae with gain'
+    )
+
+    parser.add_argument(
+        '--physical_penalty_weight',
+        type=float,
+        default=1.,
+        help='Weight of the physical penalty in the loss function'
+    )
+
+    parser.add_argument(
+        '--gain_weight',
+        type=float,
+        default=1.,
+        help='Weight of the gain part of the input when using a vae with gain'
+    )
+
+    parser.add_argument(
+        '--r-loss',
+        type=float,
+        default=1.,
+        help='r_loss weight'
     )
 
     parser.add_argument(
@@ -107,6 +157,13 @@ def parse_args():
         type=float,
         default=0.,
         help='Take only gain above this threshold'
+    )
+
+    parser.add_argument(
+        '--profile_types',
+        type=int,
+        default=1,
+        help='Number of profile types to use'
     )
 
     # Parse the arguments

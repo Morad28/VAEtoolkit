@@ -31,4 +31,11 @@ setup(
         "tensorflow>=2.16.1",
         "tqdm>=4.66.2",
     ],
+    
+    extras_require={
+        'docs': [
+            'sphinx',                    # Sphinx for documentation generation
+            'sphinx-autodoc-typehints',  # For automatic type hint documentation
+        ],
+    },
 )

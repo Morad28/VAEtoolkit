@@ -12,6 +12,9 @@ from src.config_vae import get_config
 import threading
 from tkinter import messagebox
 from abc import ABC, abstractmethod
+from scipy.spatial.distance import pdist
+from scipy.spatial import ConvexHull, Delaunay
+from scipy.stats import gaussian_kde
 
 class PostprocessingBase(ABC):
     def __init__(self, root, data_loader : DataLoader):
@@ -46,7 +49,73 @@ class PostprocessingBase(ABC):
     
     def add_custom_buttons(self, parent):
         """Add custom buttons to the control frame."""
-        pass
+        self.heatmap_active = False
+        self.heatmap_button = tk.Button(parent, text="Show Density Heatmap", command=self.toggle_density_heatmap)
+        self.heatmap_button.pack(pady=10)
+    
+
+    def toggle_density_heatmap(self):
+        self.heatmap_active = not self.heatmap_active
+        if self.heatmap_active:
+            self.heatmap_button.config(text="Hide Density Heatmap")
+            self.show_density_heatmap()
+        else:
+            self.heatmap_button.config(text="Show Density Heatmap")
+            self.plot_main()
+        
+    
+    def show_density_heatmap(self):
+        """Overlay a smooth density mesh on the main plot, coloring all regions."""
+        self.ax_main.clear()
+        _, gg = self.get_label()
+        if self.enablePCA.get():
+            latent_space = self._pca.fit_transform(self.latent_space)
+            x = latent_space[:, self.x_axis_var.get()]
+            y = latent_space[:, self.y_axis_var.get()]
+        else:
+            x = self.latent_space[:, self.x_axis_var.get()]
+            y = self.latent_space[:, self.y_axis_var.get()]
+
+        # KDE on a grid
+        nbins = 100
+        x_min, x_max = x.min(), x.max()
+        y_min, y_max = y.min(), y.max()
+        xx, yy = np.meshgrid(
+            np.linspace(x_min, x_max, nbins),
+            np.linspace(y_min, y_max, nbins)
+        )
+        positions = np.vstack([xx.ravel(), yy.ravel()])
+        values = np.vstack([x, y])
+        kernel = gaussian_kde(values)
+        density = np.reshape(kernel(positions).T, xx.shape)
+
+        # Plot the density mesh
+        mesh = self.ax_main.pcolormesh(xx, yy, density, cmap='hot', shading='auto')
+        # Remove previous colorbar if it exists
+        if hasattr(self, 'heatmap_cb') and self.heatmap_cb:
+            self.heatmap_cb.remove()
+            self.heatmap_cb = None
+        self.heatmap_cb = self.fig_main.colorbar(mesh, ax=self.ax_main)
+        self.heatmap_cb.set_label('Density (KDE)')
+
+        self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()}")
+        self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()}")
+        self.ax_main.set_title("Latent Space Density Mesh")
+        self.canvas_main.draw()
+
+    
+    def toggle_density_heatmap(self):
+        self.heatmap_active = not self.heatmap_active
+        if self.heatmap_active:
+            self.heatmap_button.config(text="Hide Density Heatmap")
+            self.show_density_heatmap()
+        else:
+            self.heatmap_button.config(text="Show Density Heatmap")
+            # Remove the heatmap colorbar if it exists
+            if hasattr(self, 'heatmap_cb') and self.heatmap_cb:
+                self.heatmap_cb.remove()
+                self.heatmap_cb = None
+            self.plot_main()
     
     def add_settings(self,parent):
         """Add custom settings to the control frame."""
@@ -60,8 +129,17 @@ class PostprocessingBase(ABC):
     def _initialize_model_components(self):
         """Initialize model-related components."""
         self.latent_space = self.data_loader.model["latent_space"]
-        self.encoder = self.data_loader.model["encoder"]
-        self.decoder = self.data_loader.model["decoder"]
+        if "decoder" in self.data_loader.model:
+            self.decoder = self.data_loader.model["decoder"]
+        else:
+            self.decoder_cnn = self.data_loader.model["decoder_cnn"]
+            self.decoder_mlp = self.data_loader.model["decoder_mlp"]
+        if "encoder" in self.data_loader.model:
+            self.encoder = self.data_loader.model["encoder"]
+        else:
+            self.encoder_cnn = self.data_loader.model["encoder_cnn"]
+            self.encoder_mlp = self.data_loader.model["encoder_mlp"]
+            self.encoder_latent = self.data_loader.model["encoder_latent"]
         self.vae_norm = self.data_loader.vae_norm
         self.res_folder = self.data_loader.result_folder
         self.dim = self.latent_space.shape[1]
@@ -169,23 +247,43 @@ class PostprocessingBase(ABC):
         _, gg = self.get_label()
         
         self._pca = PCA(n_components=self._pca_dim.get())
-        
-        if self.enablePCA.get():
-            latent_space = self._pca.fit_transform(self.latent_space)
-            explained_var = self._pca.explained_variance_ratio_
-            sc = self.ax_main.scatter(latent_space[:, self.x_axis_var.get()], latent_space[:, self.y_axis_var.get()], c = gg)
-            self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()} ({explained_var[self.x_axis_var.get()]:.2f})")
-            self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()} ({explained_var[self.y_axis_var.get()]:.2f})")
+        if self.config["DataType"] == "MNIST":
+            if self.enablePCA.get():
+                latent_space = self._pca.fit_transform(self.latent_space)
+                explained_var = self._pca.explained_variance_ratio_
+                sc = self.ax_main.scatter(latent_space[:, self.x_axis_var.get()], latent_space[:, self.y_axis_var.get()], c = gg, cmap='tab10')
+                self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()} ({explained_var[self.x_axis_var.get()]:.2f})")
+                self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()} ({explained_var[self.y_axis_var.get()]:.2f})")
+
+            else:
+                sc = self.ax_main.scatter(self.latent_space[:, self.x_axis_var.get()], self.latent_space[:, self.y_axis_var.get()], c = gg, cmap='tab10')
+                self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()}")
+                self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()}")
 
         else:
-            sc = self.ax_main.scatter(self.latent_space[:, self.x_axis_var.get()], self.latent_space[:, self.y_axis_var.get()], c = gg)
-            self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()}")
-            self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()}")
+            if self.enablePCA.get():
+                latent_space = self._pca.fit_transform(self.latent_space)
+                explained_var = self._pca.explained_variance_ratio_
+                sc = self.ax_main.scatter(latent_space[:, self.x_axis_var.get()], latent_space[:, self.y_axis_var.get()], c = gg)
+                self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()} ({explained_var[self.x_axis_var.get()]:.2f})")
+                self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()} ({explained_var[self.y_axis_var.get()]:.2f})")
+
+            else:
+                sc = self.ax_main.scatter(self.latent_space[:, self.x_axis_var.get()], self.latent_space[:, self.y_axis_var.get()], c = gg)
+                self.ax_main.set_xlabel(f"Dimension {self.x_axis_var.get()}")
+                self.ax_main.set_ylabel(f"Dimension {self.y_axis_var.get()}")
+
+        '''margin = 50  # Adjust this value to control the margin
+        self.ax_main.set_xlim(-3 - margin, 3 + margin)
+        self.ax_main.set_ylim(-3 - margin, 3 + margin)'''
             
         if hasattr(self, 'scatter_cb'):
             self.scatter_cb.update_normal(sc)
         else:
             self.scatter_cb = self.fig_main.colorbar(sc, ax=self.ax_main)
+        
+        self.scatter_cb.set_label(f"{self.config['heatmap']} (MeV)")
+
         self.canvas_main.draw()
 
     def on_click(self, event):
@@ -223,6 +321,14 @@ class PostprocessingBase(ABC):
     
  
 class PostProcessingMNIST(PostprocessingBase):
+    """
+    Postprocessing class for MNIST dataset.
+
+    This class inherits from PostprocessingBase and implements methods to visualize
+    the MNIST dataset in a latent space, plot details of selected points, and handle
+    interactions with the Tkinter GUI.
+    
+    """
     def __init__(self, root, data_loader: DataLoader):
         super().__init__(root, data_loader)
     
@@ -253,7 +359,7 @@ class PostProcessingMNIST(PostprocessingBase):
 
         laser = self.decoder.predict(latent_point,verbose=0)[0]
     
-        self.ax_detail.imshow(laser)
+        self.ax_detail.imshow(laser, cmap="gray")
         self.ax_detail.set_title("Profiles")
         self.ax_detail.legend()
         self.canvas_detail.draw()
@@ -285,6 +391,7 @@ class PostprocessingFCI(PostprocessingBase):
         self.vae_norm = self.data_loader.vae_norm     
         
     def add_custom_buttons(self, parent):
+        super().add_custom_buttons(parent)  # This keeps the base class buttons!
         tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)
         tk.Button(parent, text="Optimize", command=self.find_best).pack(pady=10)
         tk.Button(parent, text="Slices", command=self.show_latent_space).pack(pady=5)
@@ -630,6 +737,376 @@ class PostprocessingFCI(PostprocessingBase):
 
         # Redraw the canvas
         self.canvas_mapping_all.draw()
+
+class PostprocessingGain(PostprocessingBase):
+    def __init__(self, root, data_loader: DataLoader):
+        super().__init__(root, data_loader)
+
+    def _initialize_model_components(self):
+        
+        super()._initialize_model_components()
+        self.gain =  self.data_loader.dataset['values']
+        self.time =  self.data_loader.dataset['time']
+        self.filtered = self.config["filter"]
+
+        key = list(self.filtered.keys())[0]
+        gain_val = np.array(self.gain[key])
+        mask = gain_val >= self.filtered[key]
+
+        for key in self.gain.keys():
+            self.gain[key] = np.array(self.gain[key])[mask]
+            
+        self.x_max = None
+        self.vae_norm = self.data_loader.vae_norm
+        self.gain_weight = self.data_loader.config["gain_weight"]
+        
+    def add_custom_buttons(self, parent):
+        super().add_custom_buttons(parent)  # This keeps the base class buttons!
+        tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)
+        tk.Button(parent, text="Optimize", command=self.find_best).pack(pady=10)
+        tk.Button(parent, text="Slices", command=self.show_latent_space).pack(pady=5)
+
+    def get_label(self):
+        return self.gain_entry.get(), self.gain[self.gain_entry.get()]
+
+    def add_settings(self, parent):
+        options = list(self.gain.keys())
+        tk.Label(parent, text="Select value").pack(side=tk.TOP)
+        self.gain_entry = tk.StringVar(value="gain") # Default to heatmap based on gain
+        self.gain_entry.trace_add("write", self.plot_main)
+        gain_entry_menu = tk.OptionMenu(parent, self.gain_entry, *options)
+        gain_entry_menu.pack(side=tk.TOP)
+
+    def plot_detail(self, coord):
+        # Create a detailed plot in the second figure based on clicked coordinates
+        self.ax_detail.clear()
+        
+        gain_entry = self.gain_entry.get()
+        
+        if self.enablePCA.get():
+            dim = self._pca_dim.get()
+        else:
+            dim = self.dim
+        
+        axis = []
+        
+        for i in list(set(range(dim)) - {self.x_axis_var.get(), self.y_axis_var.get()}):
+            axis.append(i)
+        
+        latent_point = np.zeros((1,dim))
+        latent_point[0,self.x_axis_var.get()] = coord[0]
+        latent_point[0,self.y_axis_var.get()] = coord[1]
+        if self.x_max is not None and len(axis)>0:
+            for a in axis:
+                latent_point[0,a] = self.x_max[a]
+        
+        if self.enablePCA.get():
+            latent_point = self._pca.inverse_transform(latent_point[0]).reshape(1,self.dim)
+        else:
+            dim = self.dim
+
+        prediction = self.decoder.predict(latent_point,verbose=0)[0]
+        laser = prediction[:-1]
+        gain_val = prediction[-1] / self.gain_weight * self.vae_norm["std_gain"] + self.vae_norm["mean_gain"]
+    
+        self.ax_detail.plot(self.time, laser * self.vae_norm["std"] + self.vae_norm["mean"], label=f" {gain_entry}={gain_val}")
+        self.ax_detail.set_title("Profiles")
+        self.ax_detail.legend()
+        self.canvas_detail.draw()
+        
+        
+    def save_mapping(self, name = "decoding"):
+        mesh, unfit = self._plot_mapping(self.x_axis_var.get(),self.y_axis_var.get())  
+        decoding_dataset = tf.data.Dataset.from_tensor_slices(unfit).batch(256)          
+        laser_decoded = self.decoder.predict(decoding_dataset,verbose=0)
+        value_entry = self.gain_entry.get()
+        
+        gain = laser_decoded[:,-1] / self.gain_weight * self.vae_norm["std_gain"] + self.vae_norm["mean_gain"]
+        laser_decoded = laser_decoded[:,:-1]
+        
+        folder = self.data_loader.result_folder + f"/{name}"
+        os.makedirs(self.data_loader.result_folder + f"/{name}", exist_ok=True)
+            
+        np.save(folder+f"{value_entry}_mesh.npy", mesh)
+
+        for i in tqdm(range(laser_decoded.shape[0])):
+            np.savetxt(folder+f"/{value_entry}_{i}_{gain[i]}.dat",
+                list(zip(self.time,np.abs(laser_decoded[i] * self.vae_norm))))
+        messagebox.showinfo("Saved all data in", f"{folder}")
+        
+            
+    def save_plot(self,display_message = True):
+        # Iterate over all lines in the axes
+        ax = self.ax_detail
+        for line in ax.get_lines():
+            x_data = line.get_xdata()
+            y_data = line.get_ydata()
+            
+            # Stack the data for saving
+            data = np.column_stack((x_data, np.abs(y_data)))
+            
+            # Save to a text file
+            np.savetxt(self.res_folder + f'/laser_{self.detail_window_saving_name.get()}', data, header='time laser', comments='')
+        if display_message:
+            messagebox.showinfo("Saved", f"{self.res_folder}")
+        
+
+    def _optimize(self):
+        
+        if self.enablePCA.get():
+            dim = self._pca_dim.get()
+        else:
+            dim = self.dim
+            
+        xmin,xmax,ymin,ymax = self._get_min_max()
+        
+        bounds = [(min(xmin,ymin), max(xmax,ymax))] * dim 
+        random_samples = np.array([np.random.uniform(low, high, size=50000) for low, high in bounds]).T
+        print('Random samples:', random_samples.shape)
+        
+        if self.enablePCA.get():
+            pca_random_samples = (random_samples)
+            random_samples = self._pca.inverse_transform(pca_random_samples)
+        
+        predictions = self.decoder.predict(random_samples, verbose=0)[:,-1] / self.gain_weight * self.vae_norm["std_gain"] + self.vae_norm["mean_gain"]
+        
+        # Find the maximum
+        max_index = np.argmax(predictions)
+        if self.enablePCA.get():
+            best_x = pca_random_samples[max_index]
+        else:
+            best_x = random_samples[max_index]
+            
+        max_value = predictions[max_index]
+
+        print("Best x:", best_x)
+        print("Max value:", max_value)
+        
+        self.update_slider_values(best_x)
+        messagebox.showinfo("Optimization done", f"f(x_max) = {max_value}")
+        
+        self.x_max = best_x
+
+    def find_best(self):
+        threading.Thread(target=self._optimize).start()
+        
+    def _get_min_max(self):
+        
+        if len(self._area) < 2:
+            return (-3, 3, -3, 3)
+        
+        xmin = min(np.array(self._area)[:,0])
+        xmax = max(np.array(self._area)[:,0])
+        ymin = min(np.array(self._area)[:,1])
+        ymax = max(np.array(self._area)[:,1])
+        
+        return(xmin,xmax,ymin,ymax)
+    
+    def _plot_mapping(self,x_axis,y_axis):
+        
+        xmin,xmax,ymin,ymax = self._get_min_max()
+                
+        if hasattr(self, "slider_vars"):
+            translation_point = [float(var.get()) for var in (self.slider_vars)]
+        else:
+            translation_point = [0] * self._get_dim()
+        
+        n = self._N.get()
+        x = np.linspace(xmin,xmax,n)
+        y = np.linspace(ymin,ymax,n)
+        mesh = np.meshgrid(x,y)
+        grid = np.vstack([m.flatten() for m in mesh]).T
+        axis = []
+
+        if self.enablePCA.get() and self._pca_dim.get() == 2:
+            unfit = self._pca.inverse_transform(grid)
+        elif self.enablePCA.get() and self._pca_dim.get() > 2:
+            for i in list(set(range(self._pca_dim.get())) - {x_axis, y_axis}):
+                axis.append(i)
+            unfit = np.zeros((grid.shape[0],self._pca_dim.get() ))                
+            unfit[:,x_axis] = grid[:,0]
+            unfit[:,y_axis] = grid[:,1]
+            for a in axis:
+                unfit[:,a] = translation_point[a]
+            unfit = self._pca.inverse_transform(unfit)
+        else:
+            for i in list(set(range(self.dim)) - {x_axis, y_axis}):
+                axis.append(i)
+            unfit = np.zeros((grid.shape[0],self.dim ))
+            unfit[:,x_axis] = grid[:,0]
+            unfit[:,y_axis] = grid[:,1]
+            for a in axis:
+                unfit[:,a] = translation_point[a]
+        
+        return mesh,unfit
+
+
+    def plot_mapping(self):
+        
+        value_entry = self.gain_entry.get()
+        
+        self.mapping_window = tk.Toplevel(self.root)
+        self.mapping_window.title("Mapping")
+        
+        # Create the button
+        button = tk.Frame(self.mapping_window)
+        button.pack(pady=10)  # Use pack() to add the button to the window with some padding
+        
+        tk.Button(button, text="Save", command=self.save_mapping).grid(row=0, column=0)
+
+        self.fig_mapping, self.ax_mapping = plt.subplots()
+        self.canvas_mapping = FigureCanvasTkAgg(self.fig_mapping, master=self.mapping_window)
+        self.canvas_mapping.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self.canvas_mapping.mpl_connect("button_press_event", self.on_click)
+        self.canvas_mapping.mpl_connect("button_press_event", self.on_press)
+        self.canvas_mapping.mpl_connect("motion_notify_event", self.on_motion)
+        self.canvas_mapping.mpl_connect("button_release_event", self.on_release)
+        
+        n = self._N.get()
+        mesh, unfit = self._plot_mapping(self.x_axis_var.get(),self.y_axis_var.get())            
+        
+        value = self._predict_gain(unfit)
+
+        im = self.ax_mapping.pcolormesh(mesh[0],mesh[1], value, cmap='viridis')
+        self.ax_mapping.set_aspect('equal')
+        
+        if hasattr(self, 'mapping_cb'):
+            self.mapping_cb.remove()  
+        self.mapping_cb = self.fig_mapping.colorbar(im, ax=self.ax_mapping)
+ 
+        self.ax_mapping.set_title(value_entry)
+        self.canvas_mapping.draw()
+    
+    def update_slider_values(self, new_values):
+        """
+        Update the slider values programmatically.
+        """
+        for i, value in enumerate(new_values):
+            # Convert the value to string, replace comma with dot, then convert to float
+            value_str = str(value)
+            self.sliders[i].config(command=lambda value, idx=i: None)  # Disable callback
+            self.slider_vars[i].set(float(value_str))  # Update the slider value safely
+            self.sliders[i].config(command=lambda value, idx=i: self._on_slider_change(idx, float(value_str)))  # Re-enable callback
+
+        # Update the plots
+        self._update_latent_space_plots()
+        
+    def show_latent_space(self):
+        dim = self._get_dim()  # Get the dimensionality of the latent space
+        n = self._N.get()  # Get the resolution for the mapping
+
+        # Create a new window for the latent space visualization
+        mapping_window_all = tk.Toplevel(self.root)
+        mapping_window_all.title("Latent Space Slices with Sliders")
+
+        # Create a frame for the sliders
+        slider_frame = tk.Frame(mapping_window_all)
+        slider_frame.pack(side=tk.LEFT, fill=tk.Y)
+
+        # Create sliders for each dimension
+        self.slider_vars = []  # Store slider variables
+        self.sliders = []  # Store slider widgets
+        xmin, xmax, ymin, ymax = self._get_min_max()
+        from_value = np.round(min(xmin, ymin),0) - 1
+        to_value = np.round(max(xmax, ymax),0) + 1
+
+        for i in range(dim):
+            label = tk.Label(slider_frame, text=f"Dim {i}:")
+            label.pack(pady=5)
+
+            # Create a slider for the current dimension
+            slider_var = tk.DoubleVar(value=0.0)  # Default value for the slider
+            self.slider_vars.append(slider_var)
+            # Store the slider and its variable
+
+            slider = tk.Scale(
+                slider_frame,
+                from_=from_value,  # Minimum value for the latent space dimension
+                to=to_value,      # Maximum value for the latent space dimension
+                resolution=0.1,  # Step size for the slider
+                orient=tk.HORIZONTAL,
+                variable=slider_var,
+                length=200,
+                command=lambda value, idx=i: self._on_slider_change(idx, float(value)), 
+            )
+            slider.pack(pady=5)
+            self.sliders.append(slider)
+
+
+        # Add a button to update the plots
+        update_button = tk.Button(slider_frame, text="Update Plots", command=self._update_latent_space_plots)
+        update_button.pack(pady=10)
+
+        # Create a frame for the plots
+        plot_frame = tk.Frame(mapping_window_all)
+        plot_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        # Create the matplotlib figure and canvas
+        self.fig_mapping_all, self.ax_mapping_all = plt.subplots(dim, dim, figsize=(12, 12))
+        self.canvas_mapping_all = FigureCanvasTkAgg(self.fig_mapping_all, master=plot_frame)
+        self.canvas_mapping_all.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # Draw the initial plots
+        self._update_latent_space_plots()
+        
+    def _on_slider_change(self, index, value):
+        """
+        Callback function triggered when a slider is moved.
+        """
+        # Update the slider variable
+        self.slider_vars[index].set(float(value))
+
+    def _predict_gain(self, dataset):
+        n = self._N.get()  # Get the resolution for the mapping
+        dataset_batched = tf.data.Dataset.from_tensor_slices(dataset).batch(256)
+        values = self.decoder.predict(dataset_batched, verbose=0)[:,-1] / self.gain_weight * self.vae_norm["std_gain"] + self.vae_norm["mean_gain"]
+        values = values.reshape((n, n))
+        return (values)
+        
+
+    def _update_latent_space_plots(self):
+        """
+        Update the pairwise latent space plots based on the current slider values.
+        """
+        dim = self._get_dim()  # Get the dimensionality of the latent space
+
+        # Get the current slider values
+        fixed_values = [float(str(var.get())) for var in self.slider_vars]        
+        # Clear the existing plots
+        for i in range(dim):
+            for j in range(dim):
+                self.ax_mapping_all[i, j].clear()
+
+        # Generate the pairwise plots
+        for j in range(dim):
+            for i in range(dim):
+                if i < j:
+                    mesh, latent_points = self._plot_mapping(i,j)
+
+                    # Set the fixed values for the other dimensions
+                    for k in range(dim):
+                        if k != i and k != j:
+                            latent_points[:, k] = fixed_values[k]
+
+                    # Predict the gain values
+                    values = self._predict_gain(latent_points)
+
+                    # Plot the values
+                    im = self.ax_mapping_all[j, i].pcolormesh(mesh[0], mesh[1], values, cmap='viridis')
+                    self.ax_mapping_all[j, i].set_xlabel(f'Dim {i}')
+                    self.ax_mapping_all[j, i].set_ylabel(f'Dim {j}')
+                    # Update or create the colorbar
+                else:
+                    # Hide the plots for i >= j
+                    self.ax_mapping_all[j, i].axis("off")
+                    
+        if hasattr(self, 'ax_mapping_all_cbar'):
+            self.ax_mapping_all_cbar.update_normal(im)  # Update the existing colorbar
+        else:
+            self.ax_mapping_all_cbar = plt.colorbar(im, ax=self.ax_mapping_all.ravel().tolist())  # Create a new colorbar
+
+        # Redraw the canvas
+        self.canvas_mapping_all.draw()
     
 class PostProcessingFCI2D(PostprocessingFCI):
     def __init__(self, root, data_loader: DataLoader):
@@ -732,3 +1209,473 @@ class PostProcessingFCI2D(PostprocessingFCI):
             np.savetxt(self.res_folder + f'/density_{self.detail_window_saving_name.get()}', data, header='x density', comments='')
 
         messagebox.showinfo("Saved", f"{self.res_folder}")
+
+
+class PostprocessingCoilsMulti(PostprocessingBase):
+    """
+    Postprocessing class for COILS-MULTI models, handling multiple scalar values and multiple profile types (radius and pitch).
+
+    Inherits from PostprocessingBase.
+
+    Attributes:
+        values (list): List of names of scalar values to be processed.
+        values_nb (int): Number of scalar values.
+    """
+
+
+    def __init__(self, root, data_loader: DataLoader):
+        super().__init__(root, data_loader)
+        self.values = self.config["values"]
+        self.values_nb = len(self.values)
+
+    def _initialize_model_components(self):
+        
+        super()._initialize_model_components()
+        self.gain =  self.data_loader.dataset['values']
+        self.time =  self.data_loader.dataset['time']
+        self.filtered = self.config["filter"]
+
+        key = list(self.filtered.keys())[0]
+        gain_val = np.array(self.gain[key])
+        mask = gain_val >= self.filtered[key]
+
+        for key in self.gain.keys():
+            self.gain[key] = np.array(self.gain[key])[mask]
+            
+        self.x_max = None
+        self.vae_norm = self.data_loader.vae_norm
+        self.gain_weight = self.data_loader.config["gain_weight"]
+        
+    def add_custom_buttons(self, parent):
+        super().add_custom_buttons(parent)  # This keeps the base class buttons!
+        tk.Button(parent, text="Mapping", command=self.plot_mapping).pack(pady=10)
+        tk.Button(parent, text="Optimize", command=self.find_best).pack(pady=10)
+        tk.Button(parent, text="Slices", command=self.show_latent_space).pack(pady=5)
+
+    def get_label(self):
+        return self.gain_entry.get(), self.gain[self.gain_entry.get()]
+
+    def add_settings(self, parent):
+        options = list(self.gain.keys())
+        heat_value = self.config["heatmap"]
+        tk.Label(parent, text="Select value").pack(side=tk.TOP)
+        self.gain_entry = tk.StringVar(value=heat_value) # Default to heatmap based on gain
+        self.gain_entry.trace_add("write", self.plot_main)
+        gain_entry_menu = tk.OptionMenu(parent, self.gain_entry, *options)
+        gain_entry_menu.pack(side=tk.TOP)
+
+    def plot_detail(self, coord):
+        # Create a detailed plot in the second figure based on clicked coordinates
+        self.ax_detail.clear()
+        
+        gain_entry = self.gain_entry.get()
+        
+        if self.enablePCA.get():
+            dim = self._pca_dim.get()
+        else:
+            dim = self.dim
+        
+        axis = []
+        
+        for i in list(set(range(dim)) - {self.x_axis_var.get(), self.y_axis_var.get()}):
+            axis.append(i)
+        
+        latent_point = np.zeros((1,dim))
+        latent_point[0,self.x_axis_var.get()] = coord[0]
+        latent_point[0,self.y_axis_var.get()] = coord[1]
+        if self.x_max is not None and len(axis)>0:
+            for a in axis:
+                latent_point[0,a] = self.x_max[a]
+        
+        if self.enablePCA.get():
+            latent_point = self._pca.inverse_transform(latent_point[0]).reshape(1,self.dim)
+        else:
+            dim = self.dim
+
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+            prediction_profile = self.decoder_cnn.predict(latent_point,verbose=0)[0]
+            laser = prediction_profile
+            vals = []
+            prediction_values = self.decoder_mlp.predict(latent_point,verbose=0)[0]
+
+            for i, value in enumerate(self.values):
+                pred = prediction_values[i] / self.gain_weight * self.vae_norm[value]["std"] + self.vae_norm[value]["mean"]
+                pred = pred * 100 // 1 / 100
+                vals.append(pred)
+        
+        else:
+            prediction = self.decoder.predict(latent_point,verbose=0)[0]
+            laser = prediction[:-self.values_nb]
+            vals = []
+            for i, value in enumerate(self.values):
+                pred = prediction[-self.values_nb+i] / self.gain_weight * self.vae_norm[value]["std"] + self.vae_norm[value]["mean"]
+                pred = pred * 100 // 1 / 100
+                vals.append(pred)
+        
+        if self.config["Model"]["vae"] == "COILS-MULTI-SINGLEVAL":
+            self.ax_detail.set_ylim(0.0, 0.0015)
+
+        if self.config["profile_types"] == 2:
+            length_profile = len(laser)//2
+            pitch = laser[:length_profile]
+            radius = laser[length_profile:]
+            if self.config["Model"]["vae"] == "COILS-MULTI-SINGLEVAL":
+                pitch = np.array([pitch[0] for i in range(self.config["length_profile"])])
+                radius = np.array([radius[0] for i in range(self.config["length_profile"])])
+            self.ax_detail.plot(self.time, pitch * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"], label=f" Pitch, Values: {self.values}={vals}")
+            self.ax_detail.plot(self.time, radius * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"], label=f" Radius, Values: {self.values}={vals}")
+        else:
+            if self.config["Model"]["vae"] == "COILS-MULTI-SINGLEVAL":
+                laser = np.array([laser[0] for i in range(self.config["length_profile"])])
+            self.ax_detail.plot(self.time, laser * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"], label=f" Values: {self.values}={vals}")
+        self.ax_detail.set_title("Profiles")
+        self.ax_detail.legend()
+
+        # Calculate distances to all main points and show min distance
+        if not hasattr(self, 'mean_pairwise_distance'):
+            self.mean_pairwise_distance = np.mean(pdist(self.latent_space))
+        distances = np.linalg.norm(self.latent_space - latent_point, axis=1)
+        min_distance = np.min(distances)
+        relative_distance = min_distance / self.mean_pairwise_distance
+
+        # Calculate the direction from this point to all other points of the clusters, on all dimensions, and check on how many dimensions it is outside the cluster
+        out_dimensions = 0
+        for i in range(len(self.latent_space[0])):
+            if latent_point[0, i] < np.min(self.latent_space[:, i]) or latent_point[0, i] > np.max(self.latent_space[:, i]):
+                out_dimensions += 1
+
+
+        self.ax_detail.text(
+            0.05, 0.95,
+            f"Min dist: {min_distance:.3f}\nRel. to mean: {relative_distance:.3f}\nMean pairwise dist: {self.mean_pairwise_distance:.3f}\nOut dimensions: {out_dimensions}",
+            transform=self.ax_detail.transAxes,
+            fontsize=10, verticalalignment='top',
+            bbox=dict(boxstyle="round", fc="w")
+        )
+
+        self.canvas_detail.draw()
+        if self.config["profile_types"] == 2:
+            self.radius = radius * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"]
+        self.pitch = pitch * self.vae_norm["profile"]["std"] + self.vae_norm["profile"]["mean"]
+        
+        
+    def save_mapping(self, name = "decoding"):
+        raise NotImplementedError("This function is not fully implemented for this class and may " \
+        "therefore not function as intended, remove this line and use at your own risk.")
+        mesh, unfit = self._plot_mapping(self.x_axis_var.get(),self.y_axis_var.get())  
+        decoding_dataset = tf.data.Dataset.from_tensor_slices(unfit).batch(256)          
+        laser_decoded = self.decoder.predict(decoding_dataset,verbose=0)
+        value_entry = self.gain_entry.get()
+        
+        vals = []
+        for i, value in enumerate(self.values):
+            pred = laser_decoded[:,-self.values_nb+i] / self.gain_weight * self.vae_norm[value]["std"] + self.vae_norm[value]["mean"]
+            pred = pred * 100 // 1 / 100
+            vals.append(pred)
+        laser_decoded = laser_decoded[:,:-self.values_nb]
+        
+        folder = self.data_loader.result_folder + f"/{name}"
+        os.makedirs(self.data_loader.result_folder + f"/{name}", exist_ok=True)
+            
+        np.save(folder+f"{value_entry}_mesh.npy", mesh)
+
+        for i in tqdm(range(laser_decoded.shape[0])):
+            np.savetxt(folder+f"/{value_entry}_{i}_{vals[i]}.dat",
+                list(zip(self.time,np.abs(laser_decoded[i] * self.vae_norm))))
+        messagebox.showinfo("Saved all data in", f"{folder}")
+    
+    def _setup_detail_window(self):
+        """
+        Set up the detail window for displaying detailed plots.
+        """
+        super()._setup_detail_window()
+        self.detail_window_saving_name = tk.StringVar(value=".txt")
+        tk.Entry(self.detail_window, textvariable=self.detail_window_saving_name, width=20).pack(side=tk.TOP)
+        
+            
+    def save_plot(self,display_message = True):
+        # Iterate over all lines in the axes
+        ax = self.ax_detail
+        for line in ax.get_lines():
+            x_data = line.get_xdata()
+            y_data = line.get_ydata()
+            print("\n\nydata.shape", y_data.shape)
+            if self.config["profile_types"] == 2:
+                # save pitch and radius separately
+                data = np.column_stack((x_data, self.pitch, self.radius))
+            else:
+                # Stack the data for saving
+                data = np.column_stack((x_data, np.abs(y_data)))
+            
+            # Save to a text file
+            np.savetxt('./pitch_profiles/profiles_june_sophie' + f'/profile_{self.detail_window_saving_name.get()}', data.T, comments='')
+        if display_message:
+            messagebox.showinfo("Saved", f"{self.res_folder}")
+        
+
+    def _optimize(self):
+        
+        if self.enablePCA.get():
+            dim = self._pca_dim.get()
+        else:
+            dim = self.dim
+            
+        xmin,xmax,ymin,ymax = self._get_min_max()
+        
+        bounds = [(min(xmin,ymin), max(xmax,ymax))] * dim 
+        random_samples = np.array([np.random.uniform(low, high, size=50000) for low, high in bounds]).T
+        print('Random samples:', random_samples.shape)
+        
+        if self.enablePCA.get():
+            pca_random_samples = (random_samples)
+            random_samples = self._pca.inverse_transform(pca_random_samples)
+        
+        optimization_val = self.values[0]
+        
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+            predictions = self.decoder_mlp.predict(random_samples, verbose=0) / self.gain_weight * self.vae_norm[optimization_val]["std"] + self.vae_norm[optimization_val]["mean"]
+        else:
+            predictions = self.decoder.predict(random_samples, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[optimization_val]["std"] + self.vae_norm[optimization_val]["mean"]
+
+        # Find the maximum
+        max_index = np.argmax(predictions)
+        if self.enablePCA.get():
+            best_x = pca_random_samples[max_index]
+        else:
+            best_x = random_samples[max_index]
+            
+        max_value = predictions[max_index]
+
+        print("Best x:", best_x)
+        print("Max value:", max_value)
+        
+        self.update_slider_values(best_x)
+        messagebox.showinfo("Optimization done", f"f(x_max) = {max_value}")
+        
+        self.x_max = best_x
+
+    def find_best(self):
+        threading.Thread(target=self._optimize).start()
+        
+    def _get_min_max(self):
+        
+        if len(self._area) < 2:
+            return (-3, 3, -3, 3)
+        
+        xmin = min(np.array(self._area)[:,0])
+        xmax = max(np.array(self._area)[:,0])
+        ymin = min(np.array(self._area)[:,1])
+        ymax = max(np.array(self._area)[:,1])
+        
+        return(xmin,xmax,ymin,ymax)
+    
+    def _plot_mapping(self,x_axis,y_axis):
+        
+        xmin,xmax,ymin,ymax = self._get_min_max()
+                
+        if hasattr(self, "slider_vars"):
+            translation_point = [float(var.get()) for var in (self.slider_vars)]
+        else:
+            translation_point = [0] * self._get_dim()
+        
+        n = self._N.get()
+        x = np.linspace(xmin,xmax,n)
+        y = np.linspace(ymin,ymax,n)
+        mesh = np.meshgrid(x,y)
+        grid = np.vstack([m.flatten() for m in mesh]).T
+        axis = []
+
+        if self.enablePCA.get() and self._pca_dim.get() == 2:
+            unfit = self._pca.inverse_transform(grid)
+        elif self.enablePCA.get() and self._pca_dim.get() > 2:
+            for i in list(set(range(self._pca_dim.get())) - {x_axis, y_axis}):
+                axis.append(i)
+            unfit = np.zeros((grid.shape[0],self._pca_dim.get() ))                
+            unfit[:,x_axis] = grid[:,0]
+            unfit[:,y_axis] = grid[:,1]
+            for a in axis:
+                unfit[:,a] = translation_point[a]
+            unfit = self._pca.inverse_transform(unfit)
+        else:
+            for i in list(set(range(self.dim)) - {x_axis, y_axis}):
+                axis.append(i)
+            unfit = np.zeros((grid.shape[0],self.dim ))
+            unfit[:,x_axis] = grid[:,0]
+            unfit[:,y_axis] = grid[:,1]
+            for a in axis:
+                unfit[:,a] = translation_point[a]
+        
+        return mesh,unfit
+
+
+    def plot_mapping(self):
+        
+        value_entry = self.gain_entry.get()
+        
+        self.mapping_window = tk.Toplevel(self.root)
+        self.mapping_window.title("Mapping")
+        
+        # Create the button
+        button = tk.Frame(self.mapping_window)
+        button.pack(pady=10)  # Use pack() to add the button to the window with some padding
+        
+        tk.Button(button, text="Save", command=self.save_mapping).grid(row=0, column=0)
+
+        self.fig_mapping, self.ax_mapping = plt.subplots()
+        self.canvas_mapping = FigureCanvasTkAgg(self.fig_mapping, master=self.mapping_window)
+        self.canvas_mapping.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self.canvas_mapping.mpl_connect("button_press_event", self.on_click)
+        self.canvas_mapping.mpl_connect("button_press_event", self.on_press)
+        self.canvas_mapping.mpl_connect("motion_notify_event", self.on_motion)
+        self.canvas_mapping.mpl_connect("button_release_event", self.on_release)
+        
+        n = self._N.get()
+        mesh, unfit = self._plot_mapping(self.x_axis_var.get(),self.y_axis_var.get())            
+        
+        value = self._predict_gain(unfit)
+
+        im = self.ax_mapping.pcolormesh(mesh[0],mesh[1], value, cmap='viridis')
+        self.ax_mapping.set_aspect('equal')
+        
+        if hasattr(self, 'mapping_cb'):
+            self.mapping_cb.remove()  
+        self.mapping_cb = self.fig_mapping.colorbar(im, ax=self.ax_mapping)
+ 
+        self.ax_mapping.set_title(value_entry)
+        self.canvas_mapping.draw()
+    
+    def update_slider_values(self, new_values):
+        """
+        Update the slider values programmatically.
+        """
+        for i, value in enumerate(new_values):
+            # Convert the value to string, replace comma with dot, then convert to float
+            value_str = str(value)
+            self.sliders[i].config(command=lambda value, idx=i: None)  # Disable callback
+            self.slider_vars[i].set(float(value_str))  # Update the slider value safely
+            self.sliders[i].config(command=lambda value, idx=i: self._on_slider_change(idx, float(value_str)))  # Re-enable callback
+
+        # Update the plots
+        self._update_latent_space_plots()
+        
+    def show_latent_space(self):
+        dim = self._get_dim()  # Get the dimensionality of the latent space
+        n = self._N.get()  # Get the resolution for the mapping
+
+        # Create a new window for the latent space visualization
+        mapping_window_all = tk.Toplevel(self.root)
+        mapping_window_all.title("Latent Space Slices with Sliders")
+
+        # Create a frame for the sliders
+        slider_frame = tk.Frame(mapping_window_all)
+        slider_frame.pack(side=tk.LEFT, fill=tk.Y)
+
+        # Create sliders for each dimension
+        self.slider_vars = []  # Store slider variables
+        self.sliders = []  # Store slider widgets
+        xmin, xmax, ymin, ymax = self._get_min_max()
+        from_value = np.round(min(xmin, ymin),0) - 1
+        to_value = np.round(max(xmax, ymax),0) + 1
+
+        for i in range(dim):
+            label = tk.Label(slider_frame, text=f"Dim {i}:")
+            label.pack(pady=5)
+
+            # Create a slider for the current dimension
+            slider_var = tk.DoubleVar(value=0.0)  # Default value for the slider
+            self.slider_vars.append(slider_var)
+            # Store the slider and its variable
+
+            slider = tk.Scale(
+                slider_frame,
+                from_=from_value,  # Minimum value for the latent space dimension
+                to=to_value,      # Maximum value for the latent space dimension
+                resolution=0.1,  # Step size for the slider
+                orient=tk.HORIZONTAL,
+                variable=slider_var,
+                length=200,
+                command=lambda value, idx=i: self._on_slider_change(idx, float(value)), 
+            )
+            slider.pack(pady=5)
+            self.sliders.append(slider)
+
+
+        # Add a button to update the plots
+        update_button = tk.Button(slider_frame, text="Update Plots", command=self._update_latent_space_plots)
+        update_button.pack(pady=10)
+
+        # Create a frame for the plots
+        plot_frame = tk.Frame(mapping_window_all)
+        plot_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        # Create the matplotlib figure and canvas
+        self.fig_mapping_all, self.ax_mapping_all = plt.subplots(dim, dim, figsize=(12, 12))
+        self.canvas_mapping_all = FigureCanvasTkAgg(self.fig_mapping_all, master=plot_frame)
+        self.canvas_mapping_all.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # Draw the initial plots
+        self._update_latent_space_plots()
+        
+    def _on_slider_change(self, index, value):
+        """
+        Callback function triggered when a slider is moved.
+        """
+        # Update the slider variable
+        self.slider_vars[index].set(float(value))
+
+    def _predict_gain(self, dataset):
+        n = self._N.get()  # Get the resolution for the mapping
+        dataset_batched = tf.data.Dataset.from_tensor_slices(dataset).batch(256)
+        heatmap_value = self.config["heatmap"]
+        if self.config["Model"]["vae"] == "COILS-MULTI-OUT" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO" or self.config["Model"]["vae"] == "COILS-MULTI-OUT-DUO-FOCUS":
+            values = self.decoder_mlp.predict(dataset_batched, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[heatmap_value]["std"] + self.vae_norm[heatmap_value]["mean"]
+        else:
+            values = self.decoder.predict(dataset_batched, verbose=0)[:,-self.values_nb] / self.gain_weight * self.vae_norm[heatmap_value]["std"] + self.vae_norm[heatmap_value]["mean"]
+        values = values.reshape((n, n))
+        return (values)
+        
+
+    def _update_latent_space_plots(self):
+        """
+        Update the pairwise latent space plots based on the current slider values.
+        """
+        dim = self._get_dim()  # Get the dimensionality of the latent space
+
+        # Get the current slider values
+        fixed_values = [float(str(var.get())) for var in self.slider_vars]        
+        # Clear the existing plots
+        for i in range(dim):
+            for j in range(dim):
+                self.ax_mapping_all[i, j].clear()
+
+        # Generate the pairwise plots
+        for j in range(dim):
+            for i in range(dim):
+                if i < j:
+                    mesh, latent_points = self._plot_mapping(i,j)
+
+                    # Set the fixed values for the other dimensions
+                    for k in range(dim):
+                        if k != i and k != j:
+                            latent_points[:, k] = fixed_values[k]
+
+                    # Predict the gain values
+                    values = self._predict_gain(latent_points)
+
+                    # Plot the values
+                    im = self.ax_mapping_all[j, i].pcolormesh(mesh[0], mesh[1], values, cmap='viridis')
+                    self.ax_mapping_all[j, i].set_xlabel(f'Dim {i}')
+                    self.ax_mapping_all[j, i].set_ylabel(f'Dim {j}')
+                    # Update or create the colorbar
+                else:
+                    # Hide the plots for i >= j
+                    self.ax_mapping_all[j, i].axis("off")
+                    
+        if hasattr(self, 'ax_mapping_all_cbar'):
+            self.ax_mapping_all_cbar.update_normal(im)  # Update the existing colorbar
+        else:
+            self.ax_mapping_all_cbar = plt.colorbar(im, ax=self.ax_mapping_all.ravel().tolist())  # Create a new colorbar
+
+
+        # Redraw the canvas
+        self.canvas_mapping_all.draw()
