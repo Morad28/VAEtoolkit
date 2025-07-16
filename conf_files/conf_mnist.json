@@ -9,7 +9,6 @@
     "epoch_vae": 12,
     "epoch_rna": 10,
     "latent_dim": 5,
-    "num_components": 1,
     "batch_size_vae": 256,
     "kl_loss": 1e-5,
     "training" : [],

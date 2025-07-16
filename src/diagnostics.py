@@ -49,8 +49,8 @@ class Diagnostics():
         plt.savefig(res_folder / "losses.png")
         plt.close()
 
-        r_loss = history.history["r_loss"]
-        r_loss_val = history.history["val_r_loss"]
+        r_loss = history.history["r_loss"] if "r_loss" in history.history else None
+        r_loss_val = history.history["val_r_loss"] if "val_r_loss" in history.history else None
         if r_loss is not None and r_loss_val is not None:
             plt.figure()
             plt.grid(True,which="both")

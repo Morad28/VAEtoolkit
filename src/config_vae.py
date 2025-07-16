@@ -35,9 +35,13 @@ def get_config(path):
         "predict_z_mean": 0,                     # Whether or not to predict not from the latent space but just an encoding vector (VAE --> simple AE)
         "num_components": 1,                     # Number of components for the MoG (mixture of gaussians), if MoG is used as the latent distribution
         "profile_types": 1,                      # Number of profile types
-        "heatmap": "",                           # Value to plot the heatmap for in postprocessing
+        "heatmap": "",                           # Value to plot the heatmap for in postprocessing (necessary when using multiple values for the more recent configurations, as the normalization differs for each value)
         "reprise": {},                           # Reprise configuration dictionary
-        "filter": {},                            # Filter configuration dictionary
+        "filter": None,                          # Filter configuration dictionary
+        "finetuning": 0,                         # Whether or not to finetune the model
+        "transfer_learning": 0,                  # Whether or not to use transfer learning
+        "learning_rate": 1e-4,                   # Learning rate for the optimizer
+        "res_folder": "",                        # When using finetuning or transfer learning, the folder where the weights of the base model are stored
     }
 
     # Load configuration file

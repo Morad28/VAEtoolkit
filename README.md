@@ -123,6 +123,31 @@ datas = np.column_stack((laser_pulse, target_density))
 time = np.column_stack((time, x_mm))
 ```
 
+## Coils datasets
+For coils datasets, best practice is to have a dataset with this format, although some keys may not be explored by certain configurations:
+
+```python
+{
+    'values': {"cutoff": cutoffs, "qsup": qsups, "e99", e99s},      # You can add more scalar values if you want
+    'data': {"pitch": pitch_profiles, "radius": radius_profiles},   # Coil data numpy arrays
+    'time': coil_z_axis,                                            # Only one z axis for all coils
+    'name': names                                                   # Names of the coils, never used, but here for consistency
+}
+```
+
+For the coils datasets, certain AI models may not be compatible with the data structure, so you will have to adapt the code to your needs. This is usually caused by the length of the profiles (mostly 40 or 100 points), which is hard coded in order to be able to use CNNs correctly.
+
+# Specific configurations
+The conf_coils.json file leads to a trainign both a VAE, and a MLP to predict the gain from the latent space. It is the most basic configuration, and it is used to train on coils datasets. Most settings and specific options are unused, but it is the first configuration used for coils training.
+
+The conf_coils_gain.json leads to a training using only a VAE, and incorporating the gain as a scalar value at the end of the profile.
+
+The conf_coils_multi_values.json leads to a training using a VAE, and incorporating multiple values (cutoff, qsup, e99) to the latent space. There are many options for the model vae to choose from, check out model.py for details.
+
+The conf_coils_multi_values_singleval.json leads to a training using a VAE, and incorporating the gain as a scalar value in the latent space, while using multiple values (cutoff, qsup, e99) as inputs.
+
+In model.py, you can find the different models available for training. You can also create your own model by inheriting from the base class.
+For training on coils, the COILS-MULTI-OUT-DUO model is the best to create a new model from, as it is the first one to take into account the possibility of training on both pitch and radius profiles at the same time, and uses a double encoder, double decoder structure, which was found to be most efficient.
 
 # Important note
 

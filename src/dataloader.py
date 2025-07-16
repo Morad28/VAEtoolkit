@@ -495,6 +495,8 @@ class DataLoaderMNIST(DataLoader):
         filter = self.config.get("filter", None)
         (x_train, y_train), (_, _) = tf.keras.datasets.mnist.load_data()
         
+        print(f"Shape of x_train: {x_train.shape}, y_train: {y_train.shape}")
+
         x_train = x_train[:self.take]
         y_train = y_train[:self.take]
         
@@ -503,6 +505,7 @@ class DataLoaderMNIST(DataLoader):
             x_train = x_train[mask]
             y_train = y_train[mask]
         
+
         # normalize data
         ''' Z-score normalization
         mean = np.mean(x_train)

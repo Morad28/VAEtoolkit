@@ -61,8 +61,9 @@ class Trainer(ABC):
             values = self.config["values"]
             for value in values:
                 folder_name += f"_{value}"
-        for key in self.config["filter"]:
-            folder_name += f"_{key}min{self.config['filter'][key]}"
+        if self.config["filter"] is not None:
+            for key in self.config["filter"]:
+                folder_name += f"_{key}min{self.config['filter'][key]}"
         if physical_penalty_weight > 0:
             folder_name += f"_phy{physical_penalty_weight}"
         folder_name += f"_epc{epoch_vae}"
