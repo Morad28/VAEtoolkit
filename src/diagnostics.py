@@ -351,7 +351,11 @@ class Diagnostics():
         else:
             error = []
             for i in range(len(data)):
-                error.append( np.max(np.abs(data[i] - tilde_laser[i]) / np.abs(data[i])) )
+                if np.abs(data[i]).all() > 1e-8:
+                    error.append( np.max(np.abs(data[i] - tilde_laser[i]) / np.abs(data[i])) )
+                else:
+                    print(f"Warning: data is too small at index {i}, setting error to 0")
+                    error.append(0)
             plt.figure()            
             plt.hist(np.array(error) * 100 ,bins=30)
             plt.title("Erreur de reconstruction du laser")

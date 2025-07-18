@@ -4,7 +4,7 @@
         "vae" : "2D-FCI",
         "gain": "12MLP"
     },
-    "dataset_path": "datasets/data_2_channels_complete.npy",
+    "dataset_path": "datasets/smooth_data_testing_2chan.npy",
     "results_dir": "testing_2c/",
     "name": "dyn-shell",
     "epoch_vae": 5,

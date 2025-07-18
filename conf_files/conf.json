@@ -1,0 +1,29 @@
+{
+    "results_dir": "testing/",
+    "name": "dyn-shell",
+    "epoch_vae": 5,
+    "epoch_rna": 3,
+    "latent_dim": 5,
+    "batch_size_vae": 256,
+    "batch_size_rna": 128,
+    "kl_loss": 1e-05,
+    "vae_normalization": 1,
+    "log": false,
+    "DataType": "1DFCI",
+    "Model": {
+        "vae": "1D-FCI",
+        "gain": "12MLP"
+    },
+    "dataset_path": "datasets/smooth_data_testing.npy",
+    "training": [
+        "gain",
+        "yield"
+    ],
+    "reprise": {
+        "gain_only": 0,
+        "result_folder": "./testing/std_dyn_shell_330_latent_5_kl_1e-05_256/"
+    },
+    "filter": {
+        "gain": 2e-06
+    }
+}
