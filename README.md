@@ -138,7 +138,7 @@ For coils datasets, best practice is to have a dataset with this format, althoug
 For the coils datasets, certain AI models may not be compatible with the data structure, so you will have to adapt the code to your needs. This is usually caused by the length of the profiles (mostly 40 or 100 points), which is hard coded in order to be able to use CNNs correctly.
 
 # Specific configurations
-The conf_coils.json file leads to a trainign both a VAE, and a MLP to predict the gain from the latent space. It is the most basic configuration, and it is used to train on coils datasets. Most settings and specific options are unused, but it is the first configuration used for coils training.
+The conf_coils.json file leads to a training both a VAE, and a MLP to predict the gain from the latent space. It is the most basic configuration, and it is used to train on coils datasets. Most settings and specific options are unused, but it is the first configuration used for coils training.
 
 The conf_coils_gain.json leads to a training using only a VAE, and incorporating the gain as a scalar value at the end of the profile.
 
