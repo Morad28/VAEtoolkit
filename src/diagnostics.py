@@ -5,12 +5,19 @@ from src.dataloader import DataLoader
 import tensorflow as tf
 
 class Diagnostics():
+    """Class to handle diagnostics and save training history.
+    This class is responsible for saving the training and validation losses, reconstruction losses,
+    KL losses, and other relevant metrics during the training of a VAE model.
+    It also saves the errors from the data loader.
+    """
     def __init__(self, config, trainer : Trainer):
+        """Initialize the Diagnostics class."""
         self.config = config
         self.trainer = trainer 
         self.res_folder = self.trainer.res_folder
         
     def run_diagnostics(self):
+        """Run diagnostics and save training history."""
         history = self.trainer.history
         history_vae = history.get("vae", None)
         training = self.config['training']
@@ -26,6 +33,7 @@ class Diagnostics():
         self.save_errors(self.trainer.data_loader)
                 
     def save_loss(self, history, res_folder):
+        """Save the training and validation losses."""
         if self.config["epoch_vae"] == 0:
             print("No training done, no loss to save.")
             return
@@ -107,6 +115,7 @@ class Diagnostics():
                 plt.close()
         
     def save_errors(self, data_loader : DataLoader):
+        """Save the predicted values and errors."""
         cnn_mlp_diff = False
         if len(self.trainer.models["vae"]) == 3:
             autoencoder, encoder, decoder =  self.trainer.models["vae"]

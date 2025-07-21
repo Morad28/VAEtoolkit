@@ -6,15 +6,47 @@ from src.vae_class import VAE, VAE_MoG, Sampling, SamplingMoG, VAE_multi_decoder
 
 
 class ModelSelector:
+    """Class to select and return the appropriate model based on the configuration.
+    
+    This class provides a factory pattern for creating different types of VAE models
+    based on configuration parameters. It supports various model architectures including
+    1D and 2D FCI models, MNIST models, and COILS models.
+    
+    Attributes:
+        model_name (str): Name of the selected model.
+        vae (str): Type of VAE model to create.
+        gain (str): Type of gain network to create.
+    """
+
     def __init__(self):
+        """Initialize the ModelSelector with default values."""
         self.model_name = None
     
     def select(self, kwargs):
+        """Select the model based on the provided keyword arguments.
+
+        Args:
+            kwargs (dict): Dictionary containing model configuration parameters.
+        """
         self.vae = kwargs.get('vae', None)
         self.gain = kwargs.get('gain', None)
         
     def get_model(self,input_shape=(512,1), latent_dim=5, num_components=3, r_loss=1., k_loss=1.,
                    gain_loss=0., config=None, dataloader=None, physical_penalty_weight=1):
+        """Get the model based on the selected configuration.
+        Args:
+            input_shape (tuple, optional): Input shape of the data. Defaults to (512,1).
+            latent_dim (int, optional): Dimensionality of the latent space. Defaults to 5.
+            num_components (int, optional): Number of components for MoG. Defaults to 3.
+            r_loss (float, optional): Reconstruction loss weight. Defaults to 1.
+            k_loss (float, optional): KL divergence loss weight. Defaults to 1.
+            gain_loss (float, optional): Additional loss weight. Defaults to 0.
+            config (dict, optional): Configuration dictionary. Defaults to None.
+            dataloader (DataLoader, optional): DataLoader instance for training data. Defaults to None.
+            physical_penalty_weight (float, optional): Weight for physical penalty in COILS models. Defaults to 1.
+        Returns:
+            dict: Dictionary containing the selected model.
+        """
         s = {}
         if self.vae == '1D-FCI':
             s["vae"] = self._get_1d_vae(input_shape=input_shape, latent_dim=latent_dim,r_loss=r_loss, k_loss=k_loss, gain_loss=gain_loss)
@@ -386,6 +418,13 @@ class ModelSelector:
         return autoencoder, encoder, decoder 
     
     def _get_gain_network_12_mlp(self,input_shape, output_shape = 1):
+        """For training on 1D FCI target with a 12-layer MLP gain network
+        Args:
+            input_shape (int): Input shape of the gain network.
+            output_shape (int, optional): Output shape of the gain network. Defaults to 1.
+        Returns:
+            Model: Gain network model
+        """
 
         inputs = Input(shape=(input_shape,))
         x = Dense(64, activation='leaky_relu')(inputs)
@@ -415,6 +454,9 @@ class ModelSelector:
             r_loss (_type_, optional): _description_. Defaults to 0..
             k_loss (_type_, optional): _description_. Defaults to 1..
             gain_loss (_type_, optional): _description_. Defaults to 0..
+            physical_penalty_weight (float, optional): Weight for physical penalty in COILS models. Defaults to 1.
+            config (dict, optional): Configuration dictionary. Defaults to None.
+            dataloader (DataLoader, optional): DataLoader instance for training data. Defaults to None.
 
         Returns:
             Model: autoencoder
@@ -477,6 +519,9 @@ class ModelSelector:
             r_loss (_type_, optional): _description_. Defaults to 0..
             k_loss (_type_, optional): _description_. Defaults to 1..
             gain_loss (_type_, optional): _description_. Defaults to 0..
+            physical_penalty_weight (float, optional): Weight for physical penalty in COILS models. Defaults to 1.
+            config (dict, optional): Configuration dictionary. Defaults to None.
+            dataloader (DataLoader, optional): DataLoader instance for training data. Defaults to None.
 
         Returns:
             Model: autoencoder, with two decoders: one for the profile and one for the scalar values
@@ -556,6 +601,9 @@ class ModelSelector:
             r_loss (_type_, optional): _description_. Defaults to 0..
             k_loss (_type_, optional): _description_. Defaults to 1..
             gain_loss (_type_, optional): _description_. Defaults to 0..
+            physical_penalty_weight (float, optional): Weight for physical penalty in COILS models. Defaults to 1.
+            config (dict, optional): Configuration dictionary. Defaults to None.
+            dataloader (DataLoader, optional): DataLoader instance for training data. Defaults to None.
 
         Returns:
             Model: autoencoder, with two decoders: one for the profile and one for the scalar values,
@@ -677,6 +725,9 @@ class ModelSelector:
             r_loss (_type_, optional): _description_. Defaults to 0..
             k_loss (_type_, optional): _description_. Defaults to 1..
             gain_loss (_type_, optional): _description_. Defaults to 0..
+            physical_penalty_weight (float, optional): Weight for physical penalty in COILS models. Defaults to 1.
+            config (dict, optional): Configuration dictionary. Defaults to None.
+            dataloader (DataLoader, optional): DataLoader instance for training data. Defaults to None.
 
         Returns:
             Model: autoencoder
@@ -748,6 +799,9 @@ class ModelSelector:
             r_loss (_type_, optional): _description_. Defaults to 0..
             k_loss (_type_, optional): _description_. Defaults to 1..
             gain_loss (_type_, optional): _description_. Defaults to 0..
+            physical_penalty_weight (float, optional): Weight for physical penalty in COILS models. Defaults to 1.
+            config (dict, optional): Configuration dictionary. Defaults to None.
+            dataloader (DataLoader, optional): DataLoader instance for training data. Defaults to None.
 
         Returns:
             Model: autoencoder, with two decoders: one for the profile and one for the scalar values,
