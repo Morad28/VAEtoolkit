@@ -13,28 +13,6 @@ From the root directory of this repository, install the package using pip:
 pip install .
 ```
 
-## Git commands
-
-To update your local repository with the latest version of the remote repository:
-```bash
-git pull origin master
-```
-
-If you have modified a file, you can come back to your previous version with:
-
-```bash
-git checkout -- <file>
-```
-or if you have modified multiple files:
-```bash
-git checkout .
-```
-
-You can update by running the following command, be careful, it will try to erase all your modifications:
-
-```bash
-source update_master.sh
-```
 
 # Usage
 
